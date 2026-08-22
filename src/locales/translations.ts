@@ -126,6 +126,122 @@ export const TRANSLATIONS: Record<string, Partial<Record<Language, string>>> = {
     ta: 'கேமராவை இயக்கு',
   },
 
+  // ── First-launch Onboarding ─────────────────────────────────────────────
+  'onboard.welcomeTitle': {
+    en: 'Welcome to Senior SafeSpot',
+    zh: '欢迎使用 Senior SafeSpot',
+    ms: 'Selamat datang ke Senior SafeSpot',
+    ta: 'Senior SafeSpot-க்கு வரவேற்கிறோம்',
+  },
+  'onboard.welcomeBody': {
+    en: 'Let us set up your details once. Then getting picked up is a single tap.',
+    zh: '我们先设置一次您的资料。之后接您只需按一下。',
+    ms: 'Mari sediakan maklumat anda sekali sahaja. Selepas itu, cukup satu ketikan.',
+    ta: 'உங்கள் விவரங்களை ஒருமுறை அமைப்போம். பிறகு ஒரே தட்டலில் அழைக்கலாம்.',
+  },
+  'onboard.start': {
+    en: 'Get Started',
+    zh: '开始',
+    ms: 'Mula',
+    ta: 'தொடங்கு',
+  },
+  'onboard.stepProfile': {
+    en: 'About You',
+    zh: '关于您',
+    ms: 'Tentang Anda',
+    ta: 'உங்களைப் பற்றி',
+  },
+  'onboard.stepPlaces': {
+    en: 'Your Places',
+    zh: '您的地点',
+    ms: 'Tempat Anda',
+    ta: 'உங்கள் இடங்கள்',
+  },
+  'onboard.stepContacts': {
+    en: 'Who To Call',
+    zh: '联系人',
+    ms: 'Siapa Untuk Dihubungi',
+    ta: 'யாரை அழைப்பது',
+  },
+  'onboard.name': {
+    en: 'Your name',
+    zh: '您的姓名',
+    ms: 'Nama anda',
+    ta: 'உங்கள் பெயர்',
+  },
+  'onboard.phone': {
+    en: 'Your phone number',
+    zh: '您的电话号码',
+    ms: 'Nombor telefon anda',
+    ta: 'உங்கள் தொலைபேசி எண்',
+  },
+  'onboard.dob': {
+    en: 'Date of birth',
+    zh: '出生日期',
+    ms: 'Tarikh lahir',
+    ta: 'பிறந்த தேதி',
+  },
+  'onboard.bloodType': {
+    en: 'Blood type',
+    zh: '血型',
+    ms: 'Jenis darah',
+    ta: 'இரத்த வகை',
+  },
+  'onboard.photo': {
+    en: 'Add a photo of yourself',
+    zh: '添加您的照片',
+    ms: 'Tambah gambar anda',
+    ta: 'உங்கள் புகைப்படத்தைச் சேர்க்கவும்',
+  },
+  'onboard.photoWhy': {
+    en: 'Helps a driver or paramedic recognise you.',
+    zh: '帮助司机或急救人员认出您。',
+    ms: 'Membantu pemandu atau paramedik mengenali anda.',
+    ta: 'ஓட்டுநர் அல்லது மருத்துவர் உங்களை அடையாளம் காண உதவும்.',
+  },
+  'onboard.importContacts': {
+    en: 'Import From Phone Contacts',
+    zh: '从手机通讯录导入',
+    ms: 'Import Dari Kenalan Telefon',
+    ta: 'தொலைபேசி தொடர்புகளிலிருந்து இறக்குமதி',
+  },
+  'onboard.addManually': {
+    en: 'Add by typing',
+    zh: '手动输入添加',
+    ms: 'Tambah secara manual',
+    ta: 'தட்டச்சு செய்து சேர்க்கவும்',
+  },
+  'onboard.emergencyLocked': {
+    en: 'SCDF 995 is always here and cannot be removed.',
+    zh: 'SCDF 995 始终存在，无法删除。',
+    ms: 'SCDF 995 sentiasa ada dan tidak boleh dibuang.',
+    ta: 'SCDF 995 எப்போதும் இருக்கும், நீக்க முடியாது.',
+  },
+  'onboard.back': {
+    en: 'Back',
+    zh: '返回',
+    ms: 'Kembali',
+    ta: 'பின்செல்',
+  },
+  'onboard.next': {
+    en: 'Next',
+    zh: '下一步',
+    ms: 'Seterusnya',
+    ta: 'அடுத்து',
+  },
+  'onboard.finish': {
+    en: 'Finish Setup',
+    zh: '完成设置',
+    ms: 'Selesai',
+    ta: 'அமைப்பை முடிக்கவும்',
+  },
+  'onboard.skip': {
+    en: 'Skip for now',
+    zh: '暂时跳过',
+    ms: 'Langkau buat masa ini',
+    ta: 'இப்போதைக்கு தவிர்க்கவும்',
+  },
+
   // ── Live Location Card ──────────────────────────────────────────────────
   'live.readAddress': {
     en: 'Read Address Out Loud',

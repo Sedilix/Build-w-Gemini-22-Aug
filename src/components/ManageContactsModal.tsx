@@ -4,8 +4,10 @@
  */
 
 import React, { useState } from 'react';
-import { X, Plus, Trash2, UserPlus } from 'lucide-react';
+import { X, Plus, Trash2, UserPlus, Lock, BookUser } from 'lucide-react';
 import { EmergencyContact, AccessibilitySettings } from '../types';
+import { ensureEmergency995 } from '../data/defaultContacts';
+import { importContactsFromPhone, isContactPickerSupported } from '../utils/contacts';
 
 interface ManageContactsModalProps {
   isOpen: boolean;
@@ -22,7 +24,8 @@ export const ManageContactsModal: React.FC<ManageContactsModalProps> = ({
   onSaveContacts,
   settings,
 }) => {
-  const [list, setList] = useState<EmergencyContact[]>(contacts);
+  const [list, setList] = useState<EmergencyContact[]>(() => ensureEmergency995(contacts));
+  const [importNote, setImportNote] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
   const [newRelationship, setNewRelationship] = useState('Daughter');
   const [newPhone, setNewPhone] = useState('');
@@ -53,9 +56,32 @@ export const ManageContactsModal: React.FC<ManageContactsModalProps> = ({
   };
 
   const handleDelete = (id: string) => {
-    const updated = list.filter((c) => c.id !== id);
+    // ensureEmergency995 re-seats the locked SCDF entry even if something else
+    // removed it; the delete button is not rendered for locked contacts.
+    const updated = ensureEmergency995(list.filter((c) => c.id !== id));
     setList(updated);
     onSaveContacts(updated);
+  };
+
+  const handleImportFromPhone = async () => {
+    const result = await importContactsFromPhone(list);
+    if (result.error) {
+      setImportNote(result.error);
+      return;
+    }
+    if (result.imported.length === 0) {
+      setImportNote(
+        result.duplicates > 0 ? 'Those contacts are already saved.' : 'No contacts were chosen.'
+      );
+      return;
+    }
+    const updated = ensureEmergency995([...list, ...result.imported]);
+    setList(updated);
+    onSaveContacts(updated);
+    setImportNote(
+      `Added ${result.imported.length} contact${result.imported.length === 1 ? '' : 's'}` +
+        (result.duplicates > 0 ? `, skipped ${result.duplicates} already saved.` : '.')
+    );
   };
 
   return (
@@ -101,17 +127,36 @@ export const ManageContactsModal: React.FC<ManageContactsModalProps> = ({
                 </div>
               </div>
 
-              <button
-                onClick={() => handleDelete(c.id)}
-                className="text-brick hover:bg-brick-soft rounded-lg p-2.5 transition-colors"
-                title="Remove Contact"
-                aria-label={`Remove ${c.name}`}
-              >
-                <Trash2 className="h-5 w-5" />
-              </button>
+              {c.locked ? (
+                <span
+                  className="text-ink-faint flex items-center gap-1.5 px-2 text-xs font-bold"
+                  title="Singapore SCDF emergency line — always available and cannot be removed"
+                >
+                  <Lock className="h-4 w-4" />
+                  <span className="hidden sm:inline">Always on</span>
+                </span>
+              ) : (
+                <button
+                  onClick={() => handleDelete(c.id)}
+                  className="text-brick hover:bg-brick-soft rounded-lg p-2.5 transition-colors"
+                  title="Remove Contact"
+                  aria-label={`Remove ${c.name}`}
+                >
+                  <Trash2 className="h-5 w-5" />
+                </button>
+              )}
             </div>
           ))}
         </div>
+
+        {/* Import straight from the phone's address book where supported */}
+        {isContactPickerSupported() && (
+          <button onClick={handleImportFromPhone} className="btn btn-md btn-secondary mb-3 w-full">
+            <BookUser className="h-5 w-5" />
+            Import From Phone Contacts
+          </button>
+        )}
+        {importNote && <p className="text-ink-soft mb-3 text-sm font-semibold">{importNote}</p>}
 
         {/* Add New Contact Form */}
         <div className="border-line bg-well/60 mb-6 rounded-xl border p-4 sm:p-5">

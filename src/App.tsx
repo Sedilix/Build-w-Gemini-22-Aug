@@ -54,7 +54,8 @@ import {
   BatteryStatus,
   SPEECHMATICS_VOICE_OPTIONS
 } from './types';
-import { DEFAULT_CONTACTS } from './data/defaultContacts';
+import { DEFAULT_CONTACTS, ensureEmergency995 } from './data/defaultContacts';
+import { OnboardingWizard, OnboardingResult } from './components/OnboardingWizard';
 import { LOCATION_PRESETS } from './data/samplePresets';
 import { speakSpeechmaticsOrFallback, stopSpeaking } from './utils/speech';
 import { getBatteryStatus, watchBattery } from './utils/telemetry';
@@ -128,9 +129,11 @@ function SeniorSafeSpotHome() {
   const [contacts, setContacts] = useState<EmergencyContact[]>(() => {
     try {
       const saved = localStorage.getItem('senior_safespot_contacts');
-      if (saved) return JSON.parse(saved);
+      // 995 is re-inserted on every load: a senior who deleted it, or a stale
+      // list synced from another device, must never leave them without it.
+      if (saved) return ensureEmergency995(JSON.parse(saved));
     } catch (e) {}
-    return DEFAULT_CONTACTS;
+    return ensureEmergency995(DEFAULT_CONTACTS);
   });
 
   // State: Telemetry, Photo & AI Verification
@@ -159,6 +162,16 @@ function SeniorSafeSpotHome() {
   // True only while a hero "Pick Me Up Here!" capture is being processed, so
   // the background boot verification never disables the giant button.
   const [heroBusy, setHeroBusy] = useState(false);
+
+  // First-launch setup runs before the landing page and is remembered, so the
+  // senior is asked for their details exactly once.
+  const [hasOnboarded, setHasOnboarded] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('senior_safespot_onboarded') === 'true';
+    } catch {
+      return false;
+    }
+  });
 
   const initialVerificationDoneRef = useRef(false);
   const lastIncidentGpsPushRef = useRef(0);
@@ -215,7 +228,8 @@ function SeniorSafeSpotHome() {
   }, [settings]);
 
   // Persist contacts and sync to Firestore if user is authenticated
-  const handleSaveContacts = async (updated: EmergencyContact[]) => {
+  const handleSaveContacts = async (incoming: EmergencyContact[]) => {
+    const updated = ensureEmergency995(incoming);
     setContacts(updated);
     localStorage.setItem('senior_safespot_contacts', JSON.stringify(updated));
 
@@ -683,6 +697,58 @@ function SeniorSafeSpotHome() {
       window.location.href = `tel:995`;
     }
   }, [emergencyCountdown, verification, battery, createLiveIncident]);
+
+  const finishOnboarding = () => {
+    try {
+      localStorage.setItem('senior_safespot_onboarded', 'true');
+    } catch {
+      /* Private mode: the wizard simply runs again next launch. */
+    }
+    setHasOnboarded(true);
+  };
+
+  const handleOnboardingComplete = (result: OnboardingResult) => {
+    void handleSaveContacts(result.contacts);
+
+    // Persist the profile locally so it survives without an account, and to
+    // Firestore too when the senior is signed in.
+    const profilePatch = {
+      actualName: result.actualName,
+      phone: result.phone,
+      dob: result.dob,
+      bloodType: result.bloodType,
+      selfiePhotoUrl: result.selfiePhotoUrl,
+      savedPlaces: result.savedPlaces,
+    };
+
+    setUserProfile((prev) => ({ ...(prev ?? ({} as UserProfile)), ...profilePatch } as UserProfile));
+
+    try {
+      localStorage.setItem('senior_safespot_profile', JSON.stringify(profilePatch));
+    } catch {
+      /* Storage unavailable; the in-memory profile still serves this session. */
+    }
+
+    if (currentUser) {
+      void saveUserProfile({ uid: currentUser.uid, ...profilePatch }).catch((e) =>
+        console.warn('Could not sync onboarding profile to Firestore:', e)
+      );
+    }
+
+    finishOnboarding();
+  };
+
+  // Gate the landing page behind first-launch setup.
+  if (!hasOnboarded) {
+    return (
+      <OnboardingWizard
+        settings={settings}
+        existingContacts={contacts}
+        onComplete={handleOnboardingComplete}
+        onSkip={finishOnboarding}
+      />
+    );
+  }
 
   return (
     <div
