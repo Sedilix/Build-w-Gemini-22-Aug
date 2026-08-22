@@ -50,6 +50,7 @@ import {
   EmergencyContact, 
   LocationPreset,
   UserProfile,
+  SavedPlace,
   BatteryStatus,
   SPEECHMATICS_VOICE_OPTIONS
 } from './types';
@@ -67,6 +68,7 @@ import {
   CrashEventData 
 } from './utils/fallDetection';
 import { getBeaconsForVerification, startBeaconScan, stopBeaconScan } from './utils/ble';
+import { resolveSavedPlace } from './utils/places';
 import { auth, subscribeToUserProfile, saveUserProfile, createIncident, updateIncident } from './lib/firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { AlertCircle, PhoneCall, ShieldAlert, Sparkles, Check } from 'lucide-react';
@@ -333,7 +335,7 @@ function SeniorSafeSpotHome() {
    * then auto-scroll the elder down to the verified location card.
    */
   const handlePickMeUp = useCallback(
-    async (snappedPhotoBase64?: string, preset?: LocationPreset) => {
+    async (snappedPhotoBase64?: string, place?: SavedPlace) => {
       setHeroBusy(true);
 
       // This tap is a user gesture, which is the only context a browser will
@@ -347,22 +349,30 @@ function SeniorSafeSpotHome() {
         if (snappedPhotoBase64) {
           setCurrentPhoto(snappedPhotoBase64);
         }
-        triggerLocationVerification(coords, photoToUse, '', preset);
+        triggerLocationVerification(coords, photoToUse, '');
       };
 
-      if (preset) {
-        const presetLoc: GPSLocation = {
-          latitude: preset.lat,
-          longitude: preset.lng,
-          accuracy: preset.accuracy,
-          heading: 0,
-          speed: 0,
-          altitude: 0,
-          timestamp: Date.now(),
-        };
-        setGps(presetLoc);
-        runVerification(presetLoc);
-        return;
+      // "I'm at home / work / my clinic": trust the senior's own saved place
+      // over a GPS fix that may be drifting indoors.
+      if (place) {
+        const resolved = await resolveSavedPlace(place);
+        if (resolved && typeof resolved.lat === 'number' && typeof resolved.lng === 'number') {
+          const placeLoc: GPSLocation = {
+            latitude: resolved.lat,
+            longitude: resolved.lng,
+            accuracy: 20,
+            heading: 0,
+            speed: 0,
+            altitude: 0,
+            timestamp: Date.now(),
+          };
+          setGps(placeLoc);
+          runVerification(placeLoc);
+          return;
+        }
+        // The address could not be resolved; fall through to live GPS rather
+        // than pinning the senior to a place we could not find.
+        console.warn('Saved place could not be geocoded, using live GPS instead:', place.address);
       }
 
       const fallbackLoc: GPSLocation = gps || {
@@ -776,8 +786,10 @@ function SeniorSafeSpotHome() {
           verification={verification}
           isAnalyzing={isVerifyingAI || isLoadingGPS || heroBusy}
           isLoadingGPS={isLoadingGPS}
+          profile={userProfile}
           onPickMeUp={handlePickMeUp}
           onSpeakAddress={handleSpeakAddress}
+          onOpenProfile={() => (currentUser ? setIsProfileModalOpen(true) : setIsAuthModalOpen(true))}
           isSpeaking={isSpeaking}
           settings={settings}
         />

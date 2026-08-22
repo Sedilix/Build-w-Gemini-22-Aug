@@ -3,42 +3,44 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef, useEffect } from 'react';
-import { 
-  Camera, 
-  Sparkles, 
-  MapPin, 
-  Navigation, 
-  Volume2, 
-  AlertCircle, 
-  RefreshCw, 
-  ShieldCheck, 
-  Building2, 
-  DoorOpen, 
-  Compass, 
-  ChevronRight,
-  SunMedium,
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import {
+  Camera,
+  CameraOff,
+  Volume2,
+  AlertCircle,
+  RefreshCw,
+  Building2,
+  DoorOpen,
   CheckCircle2,
-  Radio
+  Radio,
+  Plus,
 } from 'lucide-react';
-import { 
-  GPSLocation, 
-  LocationVerificationResult, 
-  AccessibilitySettings, 
-  LocationPreset,
+import {
+  GPSLocation,
+  LocationVerificationResult,
+  AccessibilitySettings,
+  SavedPlace,
+  UserProfile,
   BLEBeaconScan,
-  BLEScanState
+  BLEScanState,
 } from '../types';
-import { LOCATION_PRESETS } from '../data/samplePresets';
 import { subscribeToBLE, startBeaconScan, pairSafetyTag, getBLECapability } from '../utils/ble';
+import { orderSavedPlaces, savedPlaceLabel, SAVED_PLACE_META } from '../utils/places';
+import { formatConciseAddress, formatDriverHint } from '../utils/address';
+
+/** Stop the camera after this long without the senior touching the screen. */
+const CAMERA_IDLE_TIMEOUT_MS = 60_000;
 
 interface HeroPickMeUpCameraProps {
   gps: GPSLocation | null;
   verification: LocationVerificationResult | null;
   isAnalyzing: boolean;
   isLoadingGPS: boolean;
-  onPickMeUp: (photoBase64?: string, preset?: LocationPreset) => void;
+  profile: UserProfile | null;
+  onPickMeUp: (photoBase64?: string, place?: SavedPlace) => void;
   onSpeakAddress: () => void;
+  onOpenProfile: () => void;
   isSpeaking: boolean;
   settings: AccessibilitySettings;
 }
@@ -48,60 +50,117 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
   verification,
   isAnalyzing,
   isLoadingGPS,
+  profile,
   onPickMeUp,
   onSpeakAddress,
+  onOpenProfile,
   isSpeaking,
   settings,
 }) => {
   const [isLiveCameraActive, setIsLiveCameraActive] = useState(false);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const [selectedPresetId, setSelectedPresetId] = useState<string>('toa-payoh-hub');
+  const [isCameraIdle, setIsCameraIdle] = useState(false);
   const [bleState, setBleState] = useState<BLEScanState>({ status: 'idle', beaconCount: 0 });
   const [bleBeacons, setBleBeacons] = useState<BLEBeaconScan[]>([]);
   const [bleUnsupportedReason, setBleUnsupportedReason] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const isYellow = settings.contrastTheme === 'yellow-black';
+  void settings; // Theming is driven by body-level design tokens, not per-component branches.
 
-  // Initialize camera when active
-  useEffect(() => {
-    let stream: MediaStream | null = null;
+  const savedPlaces = orderSavedPlaces(profile?.savedPlaces);
 
-    const startStream = async () => {
-      try {
-        setCameraError(null);
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: 'environment' },
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          },
-          audio: false,
-        });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play();
-          setIsLiveCameraActive(true);
-        }
-      } catch (err: any) {
-        console.warn('Camera access not granted or unavailable:', err);
-        setIsLiveCameraActive(false);
-        setCameraError('Camera preview unavailable on this device. You can choose a sample Singapore location or upload a photo.');
-      }
-    };
+  // ── Camera lifecycle ──────────────────────────────────────────────────────
 
-    startStream();
-
-    return () => {
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
-      }
-    };
+  const stopCamera = useCallback((idle: boolean) => {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setIsLiveCameraActive(false);
+    setIsCameraIdle(idle);
   }, []);
 
-  // Mirror the live BLE scan into component state
+  const startCamera = useCallback(async () => {
+    if (streamRef.current) return;
+    try {
+      setCameraError(null);
+      setIsCameraIdle(false);
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+        audio: false,
+      });
+
+      streamRef.current = stream;
+
+      // The <video> element is always mounted, so the ref is guaranteed to be
+      // attached by the time the stream resolves. Gating the element on
+      // isLiveCameraActive would deadlock: the flag is set here, and this only
+      // runs once the element exists.
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play().catch(() => {});
+      }
+      setIsLiveCameraActive(true);
+    } catch (err: any) {
+      console.warn('Camera access not granted or unavailable:', err);
+      setIsLiveCameraActive(false);
+      setCameraError(
+        err?.name === 'NotAllowedError'
+          ? 'Camera permission was declined. Tap below to try again, or pick a saved place.'
+          : 'No camera available on this device. You can still tap the big button — we will use your GPS.'
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    void startCamera();
+    return () => {
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    };
+  }, [startCamera]);
+
+  /**
+   * A viewfinder nobody is looking at still drains the battery and holds the
+   * camera hardware open, so idle time releases it. Any touch, keypress or
+   * scroll counts as the senior still being present.
+   */
+  useEffect(() => {
+    const markActive = () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = setTimeout(() => {
+        if (streamRef.current) stopCamera(true);
+      }, CAMERA_IDLE_TIMEOUT_MS);
+    };
+
+    const events: Array<keyof WindowEventMap> = ['pointerdown', 'keydown', 'scroll', 'touchstart'];
+    events.forEach((e) => window.addEventListener(e, markActive, { passive: true }));
+
+    // Releasing a backgrounded tab's camera matters more than the idle timer.
+    const onVisibility = () => {
+      if (document.hidden && streamRef.current) stopCamera(true);
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
+    markActive();
+
+    return () => {
+      events.forEach((e) => window.removeEventListener(e, markActive));
+      document.removeEventListener('visibilitychange', onVisibility);
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    };
+  }, [stopCamera]);
+
+  // ── BLE ───────────────────────────────────────────────────────────────────
+
   useEffect(() => {
     const unsubscribe = subscribeToBLE((state, beacons) => {
       setBleState(state);
@@ -109,9 +168,7 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
     });
 
     getBLECapability().then((cap) => {
-      if (!cap.canScan && !cap.canPairDevice) {
-        setBleUnsupportedReason(cap.reason ?? null);
-      }
+      if (!cap.canScan && !cap.canPairDevice) setBleUnsupportedReason(cap.reason ?? null);
     });
 
     return unsubscribe;
@@ -119,18 +176,16 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
 
   const handleEnableBeacons = async () => {
     const state = await startBeaconScan();
-    // Browsers without the experimental scanning API can still follow one
-    // specific device the user picks from the chooser.
     if (state.status === 'unavailable') {
       const result = await pairSafetyTag();
-      if (!result.paired && result.error) {
-        setBleUnsupportedReason(result.error);
-      }
+      if (!result.paired && result.error) setBleUnsupportedReason(result.error);
     }
   };
 
+  // ── Capture ───────────────────────────────────────────────────────────────
+
   const handleSnapAndPickMeUp = () => {
-    let photoData: string | undefined = undefined;
+    let photoData: string | undefined;
 
     if (videoRef.current && isLiveCameraActive) {
       try {
@@ -150,311 +205,229 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
       photoData = capturedPhoto;
     }
 
-    if (photoData) {
-      onPickMeUp(photoData);
-    } else {
-      // Use selected sample preset if no camera
-      const preset = LOCATION_PRESETS.find((p) => p.id === selectedPresetId) || LOCATION_PRESETS[0];
-      setCapturedPhoto(preset.sampleImageUrl);
-      onPickMeUp(preset.sampleImageUrl, preset);
-    }
+    onPickMeUp(photoData);
   };
 
+  const conciseAddress = formatConciseAddress(verification?.formattedAddress);
+  const driverHint = formatDriverHint(
+    verification?.pickupInstructionsForDriver,
+    verification?.formattedAddress
+  );
+
   return (
-    <section 
-      id="hero-pick-me-up-section"
-      className={`rounded-3xl border-3 shadow-xl overflow-hidden transition-all ${
-        isYellow
-          ? 'bg-black text-amber-300 border-amber-400'
-          : settings.contrastTheme === 'black-white'
-          ? 'bg-white text-black border-black shadow-none'
-          : settings.contrastTheme === 'warm-soft'
-          ? 'bg-[#fffaf3] text-[#2c241c] border-[#dfd0c0]'
-          : 'bg-white text-slate-900 border-slate-200/90 shadow-slate-200/50'
-      }`}
-    >
-      {/* Top Banner Tag */}
-      <div className={`px-5 py-3 border-b flex flex-wrap items-center justify-between gap-3 text-xs sm:text-sm font-bold ${
-        isYellow 
-          ? 'bg-neutral-950 border-amber-400 text-amber-300' 
-          : 'bg-indigo-900 text-white border-indigo-950'
-      }`}>
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
-          <span className="tracking-wide uppercase text-[11px] sm:text-xs">
-            1-Tap Elder Assistant • Point Camera & Tap Below
-          </span>
-        </div>
-        <div className="flex items-center gap-2 text-[11px] opacity-90">
-          <Compass className="w-3.5 h-3.5" />
-          <span>GPS Active: {gps ? `${gps.latitude.toFixed(4)}°, ${gps.longitude.toFixed(4)}°` : 'Detecting GPS...'}</span>
-        </div>
+    <section id="hero-pick-me-up-section" className="card overflow-hidden">
+      {/* Status strip — compact on mobile, one line */}
+      <div className="border-line bg-well/70 flex items-center justify-between gap-2 border-b px-3 py-2 sm:px-4">
+        <span className="section-kicker truncate">Point &amp; tap to be found</span>
+        <span className="text-ink-soft flex shrink-0 items-center gap-1.5 text-xs font-bold">
+          <span
+            className={`h-2 w-2 rounded-full ${gps ? 'bg-pine' : 'bg-ink-faint animate-pulse'}`}
+          ></span>
+          {gps ? 'GPS ready' : 'Finding GPS'}
+        </span>
       </div>
 
-      {/* Main Viewfinder & Interaction Body */}
-      <div className="p-4 sm:p-7 space-y-5">
-        {/* Camera Viewfinder Box */}
-        <div className="relative w-full aspect-16/9 max-h-[360px] sm:max-h-[420px] rounded-2xl overflow-hidden bg-slate-950 border-2 border-slate-300 dark:border-amber-400/80 shadow-inner flex items-center justify-center">
-          {/* Live Video Viewfinder */}
-          {isLiveCameraActive ? (
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="w-full h-full object-cover"
-            />
-          ) : capturedPhoto ? (
-            <img
-              src={capturedPhoto}
-              alt="Surroundings"
-              className="w-full h-full object-cover"
-            />
-          ) : cameraError ? (
-            <div className="text-center p-6 space-y-3 text-amber-200">
-              <AlertCircle className="w-14 h-14 mx-auto text-amber-400" />
-              <div className="font-bold text-base sm:text-lg text-white">
-                Camera Not Available
-              </div>
-              <p className="text-xs sm:text-sm text-slate-300 max-w-sm mx-auto">
-                {cameraError}
-              </p>
-            </div>
-          ) : (
-            <div className="text-center p-6 space-y-3 text-slate-300">
-              <Camera className="w-14 h-14 mx-auto text-slate-400 animate-pulse" />
-              <div className="font-bold text-base sm:text-lg text-white">
-                Starting Camera...
-              </div>
-              <p className="text-xs sm:text-sm text-slate-400 max-w-sm mx-auto">
-                Point your phone at the building, shopfront, or street sign in front of you.
-              </p>
+      <div className="space-y-3 p-3 sm:space-y-4 sm:p-5">
+        {/* Viewfinder */}
+        <div className="bg-ink relative aspect-4/3 w-full overflow-hidden rounded-xl sm:aspect-video">
+          {/* Always mounted so its ref exists before the stream resolves. */}
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className={`h-full w-full object-cover transition-opacity duration-300 ${
+              isLiveCameraActive ? 'opacity-100' : 'opacity-0'
+            }`}
+          />
+
+          {!isLiveCameraActive && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4 text-center">
+              {isCameraIdle ? (
+                <>
+                  <CameraOff className="h-8 w-8 text-white/50" />
+                  <p className="text-sm font-bold text-white">Camera paused to save battery</p>
+                  <button
+                    type="button"
+                    onClick={() => void startCamera()}
+                    className="btn btn-md bg-white/15 text-white backdrop-blur-sm hover:bg-white/25"
+                  >
+                    <Camera className="h-4 w-4" />
+                    Resume camera
+                  </button>
+                </>
+              ) : cameraError ? (
+                <>
+                  <AlertCircle className="h-8 w-8 text-amber-400" />
+                  <p className="max-w-xs text-xs font-semibold text-white/90">{cameraError}</p>
+                  <button
+                    type="button"
+                    onClick={() => void startCamera()}
+                    className="btn btn-md bg-white/15 text-white backdrop-blur-sm hover:bg-white/25"
+                  >
+                    <Camera className="h-4 w-4" />
+                    Try again
+                  </button>
+                </>
+              ) : capturedPhoto ? (
+                <img src={capturedPhoto} alt="Your surroundings" className="absolute inset-0 h-full w-full object-cover" />
+              ) : (
+                <>
+                  <Camera className="h-8 w-8 animate-pulse text-white/50" />
+                  <p className="text-sm font-bold text-white">Starting camera…</p>
+                </>
+              )}
             </div>
           )}
 
-          {/* Viewfinder Target Framing Brackets (Elder Visual Aid) */}
-          <div className="absolute inset-4 pointer-events-none border-2 border-dashed border-white/50 rounded-xl flex items-center justify-center">
-            <div className="w-10 h-10 border-t-2 border-l-2 border-white absolute top-2 left-2"></div>
-            <div className="w-10 h-10 border-t-2 border-r-2 border-white absolute top-2 right-2"></div>
-            <div className="w-10 h-10 border-b-2 border-l-2 border-white absolute bottom-2 left-2"></div>
-            <div className="w-10 h-10 border-b-2 border-r-2 border-white absolute bottom-2 right-2"></div>
-            
-            {/* Center Landmark Crosshair */}
-            <div className="w-4 h-4 border border-white/80 rounded-full flex items-center justify-center">
-              <div className="w-1 h-1 bg-rose-500 rounded-full"></div>
+          {/* Framing guides, only while there is a picture to frame */}
+          {isLiveCameraActive && (
+            <div className="pointer-events-none absolute inset-5">
+              <span className="absolute top-0 left-0 h-7 w-7 rounded-tl border-t-2 border-l-2 border-white/80"></span>
+              <span className="absolute top-0 right-0 h-7 w-7 rounded-tr border-t-2 border-r-2 border-white/80"></span>
+              <span className="absolute bottom-0 left-0 h-7 w-7 rounded-bl border-b-2 border-l-2 border-white/80"></span>
+              <span className="absolute right-0 bottom-0 h-7 w-7 rounded-br border-r-2 border-b-2 border-white/80"></span>
             </div>
-          </div>
+          )}
 
-          {/* Analyzing Overlay Radar */}
           {isAnalyzing && (
-            <div className="absolute inset-0 bg-black/75 backdrop-blur-xs flex flex-col items-center justify-center p-4 text-center text-white space-y-3 animate-fadeIn">
-              <RefreshCw className="w-12 h-12 text-emerald-400 animate-spin" />
-              <div className="text-lg sm:text-xl font-bold">
-                Gemini AI Verifying Surroundings...
-              </div>
-              <p className="text-xs sm:text-sm text-slate-300 max-w-md">
-                Cross-referencing storefront signs, HDB void deck pillars, and Google Street View.
-              </p>
+            <div className="bg-ink/80 absolute inset-0 flex flex-col items-center justify-center gap-2 p-4 text-center backdrop-blur-xs">
+              <RefreshCw className="h-8 w-8 animate-spin text-white" />
+              <p className="text-sm font-bold text-white sm:text-base">Checking where you are…</p>
             </div>
           )}
+        </div>
 
-          {/* Live/Preview Status Badge (Bottom of Viewfinder) */}
-          <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between gap-2 pointer-events-auto">
-            <div className="bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold text-white flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-              <span>{isLiveCameraActive ? 'Live Camera Feed' : 'Surroundings Preview'}</span>
-            </div>
+        {/* Primary action */}
+        <button
+          id="btn-hero-pick-me-up"
+          type="button"
+          disabled={isAnalyzing || isLoadingGPS}
+          onClick={handleSnapAndPickMeUp}
+          className="giant-tap btn btn-danger w-full rounded-xl px-5 py-4 text-xl font-bold sm:py-5 sm:text-2xl"
+        >
+          <Camera className="h-6 w-6 sm:h-7 sm:w-7" />
+          <span>Pick Me Up Here</span>
+        </button>
+
+        {/* Saved places — the senior's own, set in their profile */}
+        {savedPlaces.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="section-kicker">Or I'm at</span>
+            {savedPlaces.map((place) => (
+              <button
+                key={place.kind}
+                type="button"
+                disabled={isAnalyzing}
+                onClick={() => onPickMeUp(undefined, place)}
+                className="btn btn-md btn-secondary text-sm"
+              >
+                <span aria-hidden="true">{SAVED_PLACE_META[place.kind].emoji}</span>
+                <span>{savedPlaceLabel(place)}</span>
+              </button>
+            ))}
           </div>
-        </div>
-
-        {/* GIANT ACTION BUTTON: "Pick Me Up Here!" */}
-        <div className="pt-2">
+        ) : (
           <button
-            id="btn-hero-pick-me-up"
             type="button"
-            disabled={isAnalyzing}
-            onClick={handleSnapAndPickMeUp}
-            className={`giant-tap w-full py-5 sm:py-6 px-6 rounded-2xl font-black text-xl sm:text-2xl md:text-3xl border-3 transition-all flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 shadow-xl active:scale-98 ${
-              isYellow
-                ? 'bg-amber-400 hover:bg-amber-300 text-black border-amber-400 font-black'
-                : 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700 shadow-emerald-200/50'
-            } disabled:opacity-50`}
+            onClick={onOpenProfile}
+            className="border-line text-ink-soft hover:border-pine hover:text-ink flex w-full items-center justify-center gap-2 rounded-xl border border-dashed px-4 py-2.5 text-sm font-bold transition-colors"
           >
-            <div className="flex items-center gap-3">
-              <Camera className="w-8 h-8 sm:w-10 sm:h-10 animate-pulse" />
-              <span>📸 Pick Me Up Here!</span>
-            </div>
-            <span className="text-xs sm:text-sm font-semibold opacity-90 tracking-normal block sm:inline">
-              (1-Tap to Verify Location & Alert Family)
-            </span>
+            <Plus className="h-4 w-4" />
+            Save your home, work &amp; clinic for one-tap pickup
           </button>
-        </div>
+        )}
 
-        {/* Indoor vs Outdoor Detection Result Callout Banner */}
+        {/* Verified result */}
         {verification && (
-          <div className={`p-4 sm:p-5 rounded-2xl border-2 transition-all space-y-2.5 ${
-            verification.isIndoors
-              ? isYellow
-                ? 'bg-neutral-900 border-amber-400 text-amber-300'
-                : 'bg-amber-50 border-amber-300 text-amber-950'
-              : isYellow
-              ? 'bg-neutral-900 border-emerald-400 text-emerald-300'
-              : 'bg-emerald-50 border-emerald-300 text-emerald-950'
-          }`}>
+          <div
+            className={`space-y-2 rounded-xl border p-3 sm:p-4 ${
+              verification.isIndoors
+                ? 'border-ochre/40 bg-ochre-soft'
+                : 'border-pine/40 bg-pine-soft'
+            }`}
+          >
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
+              <span className="text-ink flex items-center gap-1.5 text-sm font-bold">
                 {verification.isIndoors ? (
-                  <Building2 className="w-6 h-6 text-amber-600 dark:text-amber-400 shrink-0" />
+                  <Building2 className="text-ochre-deep h-4 w-4 shrink-0" />
                 ) : (
-                  <CheckCircle2 className="w-6 h-6 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <CheckCircle2 className="text-pine-deep h-4 w-4 shrink-0" />
                 )}
-                <span className="font-extrabold text-sm sm:text-base uppercase tracking-wide">
-                  {verification.isIndoors ? '🏠 INDOOR LOCATION DETECTED' : '🚗 OUTDOOR ROADSIDE READY'}
-                </span>
-              </div>
+                {verification.isIndoors ? 'You are indoors' : 'Ready at the roadside'}
+              </span>
 
-              {/* Spoken Guidance Trigger */}
               <button
                 type="button"
                 onClick={onSpeakAddress}
-                className={`accessible-tap px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 border transition-all ${
-                  isSpeaking
-                    ? 'bg-rose-600 text-white border-rose-700 animate-pulse'
-                    : isYellow
-                    ? 'bg-amber-400 text-black border-amber-400'
-                    : 'bg-slate-900 text-white hover:bg-slate-800'
-                }`}
+                className={`btn btn-md text-sm ${isSpeaking ? 'btn-danger' : 'btn-soft'}`}
               >
-                <Volume2 className="w-3.5 h-3.5" />
-                <span>{isSpeaking ? 'Speaking...' : 'Listen to Voice'}</span>
+                <Volume2 className="h-4 w-4" />
+                {isSpeaking ? 'Stop' : 'Listen'}
               </button>
             </div>
 
-            {/* Indoor Exit Advice */}
-            {verification.isIndoors ? (
-              <div className="space-y-1 text-xs sm:text-sm font-medium">
-                <p>
-                  <strong>Context: </strong>{verification.indoorContext || 'Inside shopping mall or building corridor.'}
-                </p>
-                <p className="text-amber-900 dark:text-amber-200 font-bold flex items-start gap-1.5">
-                  <DoorOpen className="w-4 h-4 shrink-0 text-amber-700 mt-0.5" />
-                  <span><strong>Driver Pickup Advice: </strong>{verification.indoorExitGuidance || 'Please step out towards the main ground-floor taxi bay or driveway for driver pickup.'}</span>
-                </p>
-              </div>
-            ) : (
-              <p className="text-xs sm:text-sm font-semibold">
-                <strong>Pickup Point: </strong>{verification.formattedAddress} ({verification.pickupInstructionsForDriver})
-              </p>
+            {/* Street and postal code only — the full chain is unreadable aloud */}
+            {conciseAddress && (
+              <p className="text-ink text-base leading-snug font-bold sm:text-lg">{conciseAddress}</p>
             )}
 
-            {/* BLE Micro-Location Beacon (only what the radio actually heard) */}
-            {verification.bleBeacons && verification.bleBeacons.length > 0 && (
-              <div className="pt-2 border-t border-slate-200/60 dark:border-neutral-700/60 flex flex-wrap items-center justify-between gap-2 text-xs">
-                <div className="flex items-center gap-1.5 font-bold text-sky-700 dark:text-sky-300">
-                  <span className="w-2.5 h-2.5 rounded-full bg-sky-500 animate-ping"></span>
-                  <span>📡 BLE Beacon: {verification.bleBeacons[0].locationName}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="px-2 py-0.5 rounded-md font-mono font-bold bg-sky-100 dark:bg-sky-950 text-sky-800 dark:text-sky-200 border border-sky-300 dark:border-sky-800 text-[10px]">
-                    RSSI {verification.bleBeacons[0].rssi} dBm (≈{verification.bleBeacons[0].estimatedDistanceMeters}m)
-                  </span>
-                  {verification.bleAccuracyBoost && (
-                    <span className="text-[10px] uppercase font-black text-emerald-600 dark:text-emerald-400">
-                      ⚡ Beacon-refined pin
-                    </span>
-                  )}
-                </div>
-              </div>
+            {verification.isIndoors ? (
+              <p className="text-ink-soft flex items-start gap-1.5 text-sm leading-snug">
+                <DoorOpen className="text-ochre-deep mt-0.5 h-4 w-4 shrink-0" />
+                <span>{verification.indoorExitGuidance || 'Step out to the main taxi bay for pickup.'}</span>
+              </p>
+            ) : (
+              driverHint && <p className="text-ink-soft text-sm leading-snug">{driverHint}</p>
+            )}
+
+            {/* Beacon detail, only when a registered beacon refined the pin */}
+            {verification.bleAccuracyBoost && verification.bleBeacons?.[0] && (
+              <p className="text-ink-soft flex items-center gap-1.5 border-t border-current/10 pt-2 text-xs font-bold">
+                <Radio className="text-sky h-3.5 w-3.5" />
+                {verification.bleBeacons[0].locationName} · ≈{verification.bleBeacons[0].estimatedDistanceMeters}m
+              </p>
             )}
           </div>
         )}
 
-        {/* BLE Beacon Scanner Status — reflects the real radio, never a simulation */}
-        <div className={`rounded-2xl border-2 p-3.5 space-y-2 ${
-          isYellow
-            ? 'bg-neutral-900 border-amber-400 text-amber-300'
-            : 'bg-sky-50/60 border-sky-200 text-slate-800'
-        }`}>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2 font-bold text-xs sm:text-sm">
-              <Radio className={`w-4 h-4 ${bleState.status === 'scanning' ? 'text-sky-600 animate-pulse' : 'text-slate-400'}`} />
-              <span>Bluetooth Beacon Micro-Location</span>
-            </div>
+        {/* Beacon scanning — secondary, one compact line */}
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+          <span className="text-ink-faint flex items-center gap-1.5 font-bold">
+            <Radio
+              className={`h-3.5 w-3.5 ${bleState.status === 'scanning' ? 'text-sky animate-pulse' : ''}`}
+            />
+            {bleState.status === 'scanning'
+              ? `Beacons: ${bleState.beaconCount} in range`
+              : 'Beacons off'}
+          </span>
 
-            {bleState.status === 'scanning' ? (
-              <span className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-                Listening • {bleState.beaconCount} in range
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={handleEnableBeacons}
-                disabled={bleState.status === 'requesting'}
-                className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-all disabled:opacity-50 ${
-                  isYellow
-                    ? 'bg-amber-400 text-black border-amber-400'
-                    : 'bg-slate-900 text-white border-slate-900 hover:bg-slate-800'
-                }`}
-              >
-                {bleState.status === 'requesting' ? 'Starting...' : 'Turn On Beacon Scan'}
-              </button>
-            )}
-          </div>
-
-          {/* Beacons the radio is actually hearing right now */}
-          {bleBeacons.length > 0 ? (
-            <div className="space-y-1">
-              {bleBeacons.slice(0, 3).map((b) => (
-                <div key={b.id} className="flex items-center justify-between gap-2 text-[11px]">
-                  <span className="truncate font-semibold flex items-center gap-1.5">
-                    {b.isPairedTag ? '🏷️' : b.isKnownVenue ? '📍' : '📶'}
-                    <span className="truncate">{b.locationName}</span>
-                    {!b.isKnownVenue && !b.isPairedTag && (
-                      <span className="shrink-0 opacity-60 font-normal">(unregistered)</span>
-                    )}
-                  </span>
-                  <span className="shrink-0 font-mono opacity-80">
-                    {b.rssi} dBm ≈ {b.estimatedDistanceMeters}m
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-[11px] opacity-75 leading-snug">
-              {bleState.status === 'scanning'
-                ? "No beacons in range yet. Registered venue beacons and the senior's paired tag will appear here as they are detected."
-                : bleState.error || bleUnsupportedReason || "Turn on scanning to detect nearby venue beacons and the senior's safety tag for sub-metre pickup accuracy."}
-            </p>
+          {bleState.status !== 'scanning' && (
+            <button
+              type="button"
+              onClick={handleEnableBeacons}
+              disabled={bleState.status === 'requesting'}
+              className="text-ink-soft hover:text-ink font-bold underline underline-offset-2 disabled:opacity-50"
+              title={bleState.error || bleUnsupportedReason || undefined}
+            >
+              {bleState.status === 'requesting' ? 'Starting…' : 'Turn on'}
+            </button>
           )}
         </div>
 
-        {/* Presets Quick Picker (For Testing / Fallback) */}
-        <div className="pt-1 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 dark:text-inherit/70">
-          <span className="font-semibold">Quick Singapore Location Presets:</span>
-          <div className="flex flex-wrap items-center gap-1.5">
-            {LOCATION_PRESETS.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => {
-                  setSelectedPresetId(p.id);
-                  setCapturedPhoto(p.sampleImageUrl);
-                  onPickMeUp(p.sampleImageUrl, p);
-                }}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all ${
-                  selectedPresetId === p.id
-                    ? isYellow
-                      ? 'bg-amber-400 text-black border-amber-400'
-                      : 'bg-slate-900 text-white border-slate-900'
-                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200 dark:bg-neutral-800 dark:text-inherit'
-                }`}
-              >
-                {p.title.split(' • ')[0] || p.title.split(' ')[0]}
-              </button>
+        {/* Nearest beacons, only once something is actually detected */}
+        {bleBeacons.length > 0 && (
+          <div className="text-ink-soft space-y-1 text-xs">
+            {bleBeacons.slice(0, 2).map((b) => (
+              <div key={b.id} className="flex items-center justify-between gap-2">
+                <span className="truncate">
+                  {b.isPairedTag ? '🏷️' : b.isKnownVenue ? '📍' : '📶'} {b.locationName}
+                </span>
+                <span className="shrink-0 font-mono">≈{b.estimatedDistanceMeters}m</span>
+              </div>
             ))}
           </div>
-        </div>
+        )}
       </div>
     </section>
   );

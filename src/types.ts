@@ -135,6 +135,26 @@ export interface EmergencyContact {
 
 export type BloodType = 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-' | 'Unknown';
 
+/**
+ * The places a senior actually travels between, set once in their profile and
+ * offered as one-tap destinations. These replace demo location presets: a
+ * senior needs their own home and clinic, not a sample landmark.
+ */
+export type SavedPlaceKind = 'home' | 'work' | 'healthcare';
+
+export interface SavedPlace {
+  kind: SavedPlaceKind;
+  /** Free-text address as the senior or caregiver entered it. */
+  address: string;
+  /** Optional friendly name, e.g. "Tan Tock Seng Polyclinic". */
+  label?: string;
+  /** Whether the healthcare provider is public or private, for triage context. */
+  providerType?: 'public' | 'private';
+  /** Resolved coordinates, filled in once the address has been geocoded. */
+  lat?: number;
+  lng?: number;
+}
+
 export interface UserProfile {
   uid: string;
   actualName: string;
@@ -142,6 +162,8 @@ export interface UserProfile {
   bloodType: BloodType;
   address: string; // Home address e.g. "Blk 123 Toa Payoh Lorong 1 #08-456, Singapore 310123"
   selfiePhotoUrl?: string; // Selfie photo base64 / URL
+  /** Home, work and preferred healthcare provider, for one-tap pickup. */
+  savedPlaces?: SavedPlace[];
   emergencyContacts: EmergencyContact[];
   phone?: string;
   email?: string;
