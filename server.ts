@@ -59,6 +59,85 @@ app.get('/api/config/maps-key', (req, res) => {
   res.json({ mapsApiKey: mapsKey });
 });
 
+// ── OneMap SG (Singapore Land Authority) proxy ──────────────────────────────
+// Official SG geospatial API for HDB addresses, building footprints, and
+// sheltered-walkway-aware routing. Proxied server-side so credentials never
+// reach the client. Search is public; routing needs ONE_MAP_EMAIL/PASSWORD.
+
+const ONEMAP_SEARCH_URL = 'https://www.onemap.gov.sg/commonapi/search';
+const ONEMAP_AUTH_URL = 'https://developers.onemap.sg/privateapi/auth/post/sessionToken';
+const ONEMAP_ROUTE_URL = 'https://developers.onemap.sg/privateapi/routesvc/route';
+
+async function getOneMapSessionToken(): Promise<string | null> {
+  const email = process.env.ONE_MAP_EMAIL;
+  const password = process.env.ONE_MAP_PASSWORD;
+  if (!email || !password) return null;
+  try {
+    const res = await fetch(ONEMAP_AUTH_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`,
+    });
+    if (!res.ok) return null;
+    const data: any = await res.json();
+    return data.access_token || null;
+  } catch (err) {
+    console.warn('OneMap session token fetch failed:', err);
+    return null;
+  }
+}
+
+// Public address search: HDB block/postal code lookup with geometry
+app.get('/api/onemap/search', async (req, res) => {
+  const query = String(req.query.q || '').trim();
+  if (!query) {
+    return res.status(400).json({ success: false, error: 'Missing ?q= search value' });
+  }
+  try {
+    const url = `${ONEMAP_SEARCH_URL}?searchVal=${encodeURIComponent(query)}&returnGeom=Y&getAddrDetails=Y&pageNum=1`;
+    const upstream = await fetch(url);
+    const contentType = upstream.headers.get('content-type') || '';
+    if (!upstream.ok || !contentType.includes('application/json')) {
+      return res.json({ success: false, results: [], totalFound: 0, error: `OneMap upstream returned ${upstream.status}` });
+    }
+    const data = await upstream.json();
+    res.json({ success: true, results: data.results || [], totalFound: data.totalFound || 0 });
+  } catch (err) {
+    console.warn('OneMap search error:', err);
+    res.status(502).json({ success: false, error: 'OneMap search unavailable' });
+  }
+});
+
+// Sheltered walkway / walking route between two SG coordinates (private API)
+app.post('/api/onemap/route', async (req, res) => {
+  const { startLat, startLng, endLat, endLng, routeType = 'walk' } = req.body || {};
+  if ([startLat, startLng, endLat, endLng].some((v) => typeof v !== 'number')) {
+    return res.status(400).json({ success: false, error: 'startLat/startLng/endLat/endLng numbers required' });
+  }
+
+  const token = await getOneMapSessionToken();
+  if (!token) {
+    return res.json({
+      success: false,
+      error: 'OneMap routing requires ONE_MAP_EMAIL and ONE_MAP_PASSWORD env credentials',
+    });
+  }
+
+  try {
+    const url = `${ONEMAP_ROUTE_URL}?start=${startLat},${startLng}&end=${endLat},${endLng}&routeType=${routeType}&token=${token}`;
+    const upstream = await fetch(url);
+    const contentType = upstream.headers.get('content-type') || '';
+    if (!upstream.ok || !contentType.includes('application/json')) {
+      return res.json({ success: false, error: `OneMap routing upstream returned ${upstream.status}` });
+    }
+    const data = await upstream.json();
+    res.json({ success: true, ...data });
+  } catch (err) {
+    console.warn('OneMap route error:', err);
+    res.status(502).json({ success: false, error: 'OneMap routing unavailable' });
+  }
+});
+
 // Helper: Get Speechmatics API Key safely from environment
 function getSpeechmaticsApiKey(): string | undefined {
   return (
@@ -190,8 +269,11 @@ app.post('/api/speechmatics/tts', async (req, res) => {
     return res.status(400).json({ error: 'No speakable text content after sanitization.' });
   }
 
-  // Sanitize voice identifier
-  const safeVoice = (voice || 'sarah').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40) || 'sarah';
+  // Voice IDs currently supported by the Speechmatics TTS preview API.
+  // Unknown/removed IDs (e.g. 'ariana') fall back to the default instead of
+  // triggering a Speechmatics error and a silent Web Speech fallback client-side.
+  const VALID_TTS_VOICES = ['sarah', 'megan', 'theo', 'jack'];
+  const safeVoice = VALID_TTS_VOICES.includes(String(voice || '')) ? voice : 'sarah';
 
   try {
     const ctrl = new AbortController();

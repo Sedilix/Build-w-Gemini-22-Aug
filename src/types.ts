@@ -106,6 +106,15 @@ export type HighContrastTheme = 'normal' | 'yellow-black' | 'black-white' | 'war
 
 export type FontSizeLevel = 'standard' | 'large' | 'extra-large';
 
+// Singapore's 4 official languages for elder-friendly localization
+export type Language = 'en' | 'zh' | 'ms' | 'ta';
+
+export interface BatteryStatus {
+  level: number | null; // 0-100, null if unsupported
+  charging: boolean | null;
+  supported: boolean;
+}
+
 export interface SpeechmaticsVoiceOption {
   id: string;
   name: string;
@@ -173,6 +182,8 @@ export interface AccessibilitySettings {
   alwaysShowStreetView: boolean;
   speechmaticsVoice: string; // 'sarah' | 'megan' | 'theo' | 'jack'
   speechmaticsRate?: number; // 0.85 (elder-friendly) to 1.0
+  language: Language; // UI + voice readout language (default 'en')
+  fallDetection?: boolean; // Passive accelerometer fall monitoring
 }
 
 export interface LocationPreset {
@@ -185,4 +196,31 @@ export interface LocationPreset {
   accuracy: number;
   sampleImageUrl: string;
   landmarkHint: string;
+}
+
+/**
+ * Live incident document stored at Firestore `Incidents/{incidentId}`.
+ * Created when the elder alerts family, so caregivers can open
+ * `/track/:incidentId` and follow the senior's live GPS without an app.
+ */
+export interface Incident {
+  incidentId: string;
+  elderUid: string | null;
+  elderName: string;
+  elderSelfieUrl?: string;
+  bloodType?: string;
+  medicalNotes?: string;
+  currentGps: {
+    lat: number;
+    lng: number;
+    accuracy: number;
+    timestamp: number;
+  } | null;
+  batteryLevel: number | null; // 0-100, null if unsupported
+  isCharging: boolean | null;
+  nearestLandmarks: string[];
+  formattedAddress?: string;
+  status: 'active' | 'resolved';
+  createdAt: number;
+  updatedAt: number;
 }

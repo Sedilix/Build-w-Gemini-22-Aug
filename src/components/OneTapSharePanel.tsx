@@ -7,18 +7,19 @@ import React, { useState } from 'react';
 import { 
   Send, 
   Phone, 
-  MessageSquare, 
-  Share2, 
   Copy, 
   Check, 
   Navigation, 
   ExternalLink, 
   UserPlus, 
-  Sparkles,
   HeartHandshake,
-  Car
+  Car,
+  Share2,
+  Radio,
+  Loader2
 } from 'lucide-react';
 import { EmergencyContact, LocationVerificationResult, AccessibilitySettings } from '../types';
+import { t } from '../locales/translations';
 
 interface OneTapSharePanelProps {
   contacts: EmergencyContact[];
@@ -26,6 +27,9 @@ interface OneTapSharePanelProps {
   settings: AccessibilitySettings;
   onOpenManageContacts: () => void;
   onOpenCaregiverPreview: () => void;
+  /** Creates a Firestore incident and SMSes the /track/:id live link to family */
+  onAlertFamily: () => void;
+  isAlertingFamily: boolean;
 }
 
 export const OneTapSharePanel: React.FC<OneTapSharePanelProps> = ({
@@ -34,11 +38,13 @@ export const OneTapSharePanel: React.FC<OneTapSharePanelProps> = ({
   settings,
   onOpenManageContacts,
   onOpenCaregiverPreview,
+  onAlertFamily,
+  isAlertingFamily,
 }) => {
   const [copied, setCopied] = useState(false);
   const [lastSentTo, setLastSentTo] = useState<string | null>(null);
 
-  const isYellow = settings.contrastTheme === 'yellow-black';
+  const lang = settings.language || 'en';
 
   const shareUrls = verification?.shareUrls;
   const address = verification?.formattedAddress || 'My Current Location';
@@ -89,86 +95,80 @@ export const OneTapSharePanel: React.FC<OneTapSharePanelProps> = ({
   };
 
   return (
-    <section
-      id="card-one-tap-triggers"
-      className={`rounded-2xl p-6 sm:p-7 border transition-all shadow-xs ${
-        isYellow
-          ? 'bg-black text-amber-300 border-amber-400'
-          : settings.contrastTheme === 'black-white'
-          ? 'bg-white text-black border-black'
-          : settings.contrastTheme === 'warm-soft'
-          ? 'bg-[#fffaf3] text-[#2c241c] border-[#dfd2c4]'
-          : 'bg-white text-slate-900 border-slate-200/90'
-      }`}
-    >
+    <section id="card-one-tap-triggers" className="card p-6 sm:p-7">
       {/* Title Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-            isYellow ? 'bg-amber-400 text-black' : 'bg-slate-900 text-white'
-          }`}>
-            <HeartHandshake className="w-5 h-5" />
+          <div className="icon-tile">
+            <HeartHandshake className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-xl sm:text-2xl font-bold tracking-tight leading-none text-slate-900 dark:text-inherit">
-              One-Tap Caregiver & Family Pickup
+            <h3 className="font-display text-2xl leading-none font-bold tracking-tight">
+              {t('share.title', lang)}
             </h3>
-            <p className="text-xs sm:text-sm font-normal text-slate-500 dark:text-inherit/75 mt-1">
-              Tap any contact below to immediately send your exact verified location & photo
+            <p className="text-ink-soft mt-1 text-sm font-normal sm:text-base">
+              {t('share.subtitle', lang)}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            id="btn-alert-family-live-track"
+            onClick={onAlertFamily}
+            disabled={isAlertingFamily}
+            className="btn btn-md btn-danger"
+            title="Create a live tracking incident and send the link to your family"
+          >
+            {isAlertingFamily ? <Loader2 className="h-5 w-5 animate-spin" /> : <Radio className="h-5 w-5" />}
+            <span>{t('share.alertFamily', lang)}</span>
+          </button>
+
           <button
             id="btn-preview-caregiver-view"
             onClick={onOpenCaregiverPreview}
-            className="accessible-tap px-3.5 py-1.5 rounded-xl font-semibold text-xs sm:text-sm border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 transition-all shadow-2xs"
+            className="btn btn-md btn-secondary"
           >
-            <Car className="w-4 h-4 text-emerald-600" />
-            <span>Driver Screen</span>
+            <Car className="text-pine h-5 w-5" />
+            <span>{t('share.driverScreen', lang)}</span>
           </button>
 
           <button
             id="btn-manage-contacts"
             onClick={onOpenManageContacts}
-            className="accessible-tap px-3.5 py-1.5 rounded-xl font-semibold text-xs sm:text-sm border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 transition-all shadow-2xs"
+            className="btn btn-md btn-secondary"
           >
-            <UserPlus className="w-4 h-4 text-slate-500" />
-            <span>Edit Contacts</span>
+            <UserPlus className="text-ink-soft h-5 w-5" />
+            <span>{t('share.editContacts', lang)}</span>
           </button>
         </div>
       </div>
 
       {/* Confirmation Feedback Pill */}
       {lastSentTo && (
-        <div className="mb-4 p-3 rounded-xl bg-emerald-600 text-white font-semibold text-sm sm:text-base flex items-center justify-center gap-2 shadow-xs">
-          <Check className="w-4 h-4" />
+        <div className="btn-primary mb-4 flex items-center justify-center gap-2 rounded-xl p-3.5 text-base font-bold sm:text-lg">
+          <Check className="h-5 w-5" />
           <span>Location dispatched to {lastSentTo}!</span>
         </div>
       )}
 
       {/* 1-Tap Giant Emergency Contact Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {contacts.map((contact) => (
           <div
             key={contact.id}
-            className={`p-5 rounded-xl border transition-all flex flex-col justify-between ${
-              isYellow
-                ? 'bg-neutral-950 border-amber-400 text-amber-300'
-                : 'bg-slate-50/70 border-slate-200/90 hover:border-slate-300 hover:bg-slate-50 text-slate-900 shadow-2xs'
-            }`}
+            className="border-line bg-well/50 hover:border-line-strong flex flex-col justify-between rounded-xl border p-5 transition-colors"
           >
-            <div className="flex items-center justify-between gap-3 mb-4">
+            <div className="mb-4 flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="text-3xl p-2 rounded-xl bg-white dark:bg-neutral-800 border border-slate-200/80 shadow-2xs">
+                <div className="border-line bg-surface text-3xl rounded-xl border p-2 shadow-xs">
                   {contact.emoji}
                 </div>
                 <div>
-                  <div className="font-bold text-base sm:text-lg leading-tight text-slate-900 dark:text-inherit">
+                  <div className="text-ink text-lg leading-tight font-bold sm:text-xl">
                     {contact.name}
                   </div>
-                  <div className="text-xs sm:text-sm font-medium text-slate-500 dark:text-inherit/70 mt-0.5">
+                  <div className="text-ink-soft mt-0.5 text-sm font-semibold sm:text-base">
                     {contact.phone} {contact.isPrimary && '• Primary'}
                   </div>
                 </div>
@@ -176,31 +176,23 @@ export const OneTapSharePanel: React.FC<OneTapSharePanelProps> = ({
             </div>
 
             {/* Direct Action Buttons per contact */}
-            <div className="grid grid-cols-2 gap-2.5 mt-1">
+            <div className="mt-1 grid grid-cols-2 gap-2.5">
               <button
                 id={`btn-send-sms-${contact.id}`}
                 onClick={() => triggerSendContact(contact, 'sms')}
-                className={`giant-tap px-4 py-3 rounded-xl font-bold text-sm sm:text-base flex items-center justify-center gap-2 active:scale-98 transition-all shadow-xs ${
-                  isYellow
-                    ? 'bg-amber-400 text-black hover:bg-amber-300'
-                    : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                }`}
+                className="btn btn-lg btn-primary"
               >
-                <Send className="w-4 h-4" />
-                <span>Send Pin</span>
+                <Send className="h-5 w-5" />
+                <span>{t('share.sendPin', lang)}</span>
               </button>
 
               <button
                 id={`btn-call-${contact.id}`}
                 onClick={() => triggerSendContact(contact, 'call')}
-                className={`giant-tap px-4 py-3 rounded-xl font-bold text-sm sm:text-base flex items-center justify-center gap-2 border active:scale-98 transition-all ${
-                  isYellow
-                    ? 'border-amber-400 text-amber-300 hover:bg-amber-400/10'
-                    : 'border-slate-200 hover:bg-white text-slate-800 bg-white shadow-2xs'
-                }`}
+                className="btn btn-lg btn-secondary"
               >
-                <Phone className="w-4 h-4 text-slate-600 dark:text-inherit" />
-                <span>Call</span>
+                <Phone className="text-ink-soft h-5 w-5" />
+                <span>{t('share.call', lang)}</span>
               </button>
             </div>
           </div>
@@ -208,49 +200,34 @@ export const OneTapSharePanel: React.FC<OneTapSharePanelProps> = ({
       </div>
 
       {/* Universal Quick Action Row */}
-      <div className="mt-5 pt-4 border-t border-slate-100 dark:border-neutral-800 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-        {/* Open in Google Maps */}
+      <div className="border-line mt-5 grid grid-cols-1 gap-2.5 border-t pt-4 sm:grid-cols-3">
         <a
           id="btn-open-google-maps-navigation"
           href={shareUrls?.googleMapsUrl || `https://www.google.com/maps`}
           target="_blank"
           rel="noopener noreferrer"
-          className={`accessible-tap px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 border transition-all ${
-            isYellow
-              ? 'border-amber-400 hover:bg-amber-400/10 text-amber-300'
-              : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-800 shadow-2xs'
-          }`}
+          className="btn btn-md btn-secondary"
         >
-          <Navigation className="w-4 h-4 text-blue-600" />
+          <Navigation className="text-sky h-5 w-5" />
           <span>Open Maps</span>
-          <ExternalLink className="w-3.5 h-3.5 opacity-60" />
+          <ExternalLink className="h-4 w-4 opacity-60" />
         </a>
 
-        {/* Copy Share Details */}
         <button
           id="btn-copy-share-pin-link"
           onClick={handleCopyLink}
-          className={`accessible-tap px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 border transition-all ${
-            isYellow
-              ? 'border-amber-400 hover:bg-amber-400/10 text-amber-300'
-              : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-800 shadow-2xs'
-          }`}
+          className="btn btn-md btn-secondary"
         >
-          {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-slate-600" />}
-          <span>{copied ? 'Link Copied!' : 'Copy Location Link'}</span>
+          {copied ? <Check className="text-pine h-5 w-5" /> : <Copy className="text-ink-soft h-5 w-5" />}
+          <span>{copied ? t('share.copied', lang) : t('share.copyLink', lang)}</span>
         </button>
 
-        {/* Universal Share Sheet */}
         <button
           id="btn-universal-share-sheet"
           onClick={handleNativeShare}
-          className={`accessible-tap px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 border transition-all ${
-            isYellow
-              ? 'border-amber-400 hover:bg-amber-400/10 text-amber-300'
-              : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-800 shadow-2xs'
-          }`}
+          className="btn btn-md btn-secondary"
         >
-          <Share2 className="w-4 h-4 text-indigo-600" />
+          <Share2 className="text-sky h-5 w-5" />
           <span>Share to Any App</span>
         </button>
       </div>

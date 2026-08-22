@@ -11,13 +11,11 @@ import {
   Heart, 
   MapPin, 
   Calendar, 
-  Phone, 
   Users, 
   ShieldCheck, 
   Check, 
   RefreshCw, 
   Upload, 
-  Sparkles, 
   LogOut, 
   AlertCircle,
   FileText
@@ -65,7 +63,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const isYellow = settings.contrastTheme === 'yellow-black';
+  void settings;
 
   useEffect(() => {
     if (profile) {
@@ -77,9 +75,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       setSelfiePhotoUrl(profile.selfiePhotoUrl);
     } else if (user) {
       setActualName(user.displayName || '');
-      if (user.phoneNumber) {
-        // Pre-fill phone if available
-      }
     }
   }, [profile, user, isOpen]);
 
@@ -213,37 +208,19 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div 
-      id="modal-profile-backdrop"
-      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-fadeIn"
-    >
-      <div 
-        id="modal-profile-content"
-        className={`w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden my-auto max-h-[92vh] flex flex-col transition-all ${
-          isYellow
-            ? 'bg-black text-amber-300 border-amber-400'
-            : settings.contrastTheme === 'black-white'
-            ? 'bg-white text-black border-black'
-            : 'bg-white text-slate-900 border-slate-200'
-        }`}
-      >
+    <div id="modal-profile-backdrop" className="modal-backdrop">
+      <div id="modal-profile-content" className="modal-panel max-w-2xl">
         {/* Header */}
-        <div className={`p-4 sm:p-5 border-b flex items-center justify-between shrink-0 ${
-          isYellow
-            ? 'border-amber-400 bg-neutral-950'
-            : 'border-slate-200/90 bg-slate-50/80'
-        }`}>
+        <div className="modal-head">
           <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold shrink-0 ${
-              isYellow ? 'bg-amber-400 text-black' : 'bg-slate-900 text-white'
-            }`}>
-              <User className="w-5 h-5" />
+            <div className="icon-tile">
+              <User className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-xl sm:text-2xl font-bold tracking-tight leading-none">
+              <h2 className="font-display text-2xl leading-none font-bold tracking-tight">
                 Senior User Profile
               </h2>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-inherit/70 mt-1">
+              <p className="text-ink-soft mt-1 text-sm sm:text-base">
                 Firestore Cloud Profile & SCDF Emergency Record
               </p>
             </div>
@@ -254,87 +231,87 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               stopCamera();
               onClose();
             }}
-            className="accessible-tap p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 dark:hover:bg-neutral-800 transition-all"
+            className="accessible-tap text-ink-soft hover:bg-well hover:text-ink rounded-xl p-2 transition-colors"
             aria-label="Close"
           >
-            <X className="w-6 h-6" />
+            <X className="h-6 w-6" />
           </button>
         </div>
 
         {/* Scrollable Form Body */}
-        <form onSubmit={handleSaveProfile} className="p-4 sm:p-6 overflow-y-auto space-y-6 flex-1">
+        <form onSubmit={handleSaveProfile} className="flex-1 space-y-6 overflow-y-auto p-4 sm:p-6">
           {errorMessage && (
-            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs sm:text-sm font-medium flex items-start gap-2.5">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
+            <div className="border-brick/40 bg-brick-soft text-brick-deep flex items-start gap-2.5 rounded-xl border p-4 text-sm font-bold sm:text-base">
+              <AlertCircle className="text-brick mt-0.5 h-5 w-5 shrink-0" />
               <span>{errorMessage}</span>
             </div>
           )}
 
           {saveSuccess && (
-            <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-sm font-bold flex items-center gap-2.5">
-              <Check className="w-5 h-5 text-emerald-600" />
+            <div className="border-pine/40 bg-pine-soft text-pine-deep flex items-center gap-2.5 rounded-xl border p-4 text-base font-bold">
+              <Check className="text-pine h-5 w-5" />
               <span>Profile updated in Firestore Users/{user?.uid}!</span>
             </div>
           )}
 
           {/* Section 1: Selfie Photo Capture */}
-          <div className="p-4 rounded-xl border border-slate-200 dark:border-neutral-800 bg-slate-50/50 dark:bg-neutral-900/50 space-y-3">
+          <div className="border-line bg-well/60 space-y-3 rounded-xl border p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Camera className="w-5 h-5 text-indigo-600 dark:text-amber-400" />
-                <label className="font-bold text-sm sm:text-base">
+                <Camera className="text-sky h-5 w-5" />
+                <label className="text-base font-bold sm:text-lg">
                   Profile Selfie Photo (Driver & Responder Visual ID)
                 </label>
               </div>
               {selfiePhotoUrl && (
-                <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                  <ShieldCheck className="w-3.5 h-3.5" /> Photo Saved
+                <span className="text-pine-deep flex items-center gap-1 text-sm font-bold">
+                  <ShieldCheck className="h-4 w-4" /> Photo Saved
                 </span>
               )}
             </div>
 
-            <p className="text-xs text-slate-500 dark:text-inherit/70">
+            <p className="text-ink-soft text-sm">
               Taking a clear selfie helps arriving caregivers and ambulance drivers spot you immediately.
             </p>
 
-            <div className="flex flex-col sm:flex-row items-center gap-4 pt-1">
+            <div className="flex flex-col items-center gap-4 pt-1 sm:flex-row">
               {/* Photo Preview Circle */}
-              <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-full overflow-hidden border-4 border-slate-300 dark:border-amber-400/80 bg-slate-200 shrink-0 shadow-md flex items-center justify-center">
+              <div className="border-line-strong bg-well relative h-28 w-28 shrink-0 overflow-hidden rounded-full border-4 shadow-md sm:h-32 sm:w-32 flex items-center justify-center">
                 {isCameraActive ? (
                   <video
                     ref={videoRef}
                     autoPlay
                     playsInline
                     muted
-                    className="w-full h-full object-cover"
+                    className="h-full w-full object-cover"
                   />
                 ) : selfiePhotoUrl ? (
                   <img
                     src={selfiePhotoUrl}
                     alt="Senior Selfie"
-                    className="w-full h-full object-cover"
+                    className="h-full w-full object-cover"
                   />
                 ) : (
-                  <User className="w-14 h-14 text-slate-400" />
+                  <User className="text-ink-faint h-14 w-14" />
                 )}
               </div>
 
               {/* Action Buttons for Camera */}
-              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
                 {isCameraActive ? (
                   <>
                     <button
                       type="button"
                       onClick={captureSelfie}
-                      className="px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-emerald-600 text-white hover:bg-emerald-700 shadow-md flex items-center gap-2"
+                      className="btn btn-md btn-primary"
                     >
-                      <Camera className="w-4 h-4" />
+                      <Camera className="h-5 w-5" />
                       <span>Take Photo</span>
                     </button>
                     <button
                       type="button"
                       onClick={stopCamera}
-                      className="px-3 py-2.5 rounded-xl font-semibold text-xs sm:text-sm border border-slate-300 hover:bg-slate-100 dark:border-neutral-700"
+                      className="btn btn-md btn-secondary"
                     >
                       Cancel
                     </button>
@@ -344,18 +321,18 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                     <button
                       type="button"
                       onClick={startCamera}
-                      className="px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-indigo-600 text-white hover:bg-indigo-700 shadow-xs flex items-center gap-2"
+                      className="btn btn-md btn-primary"
                     >
-                      <Camera className="w-4 h-4" />
+                      <Camera className="h-5 w-5" />
                       <span>{selfiePhotoUrl ? 'Retake Selfie' : 'Take Selfie Photo'}</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="px-3 py-2.5 rounded-xl font-semibold text-xs sm:text-sm border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-1.5"
+                      className="btn btn-md btn-secondary"
                     >
-                      <Upload className="w-3.5 h-3.5" />
+                      <Upload className="h-4 w-4" />
                       <span>Upload</span>
                     </button>
 
@@ -373,70 +350,55 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           </div>
 
           {/* Section 2: Personal Details (Name & DOB) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-inherit/80 mb-1.5">
-                Full Actual Name *
-              </label>
+              <label className="label" htmlFor="profile-name">Full Actual Name *</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <User className="w-4 h-4" />
+                <div className="text-ink-faint pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                  <User className="h-5 w-5" />
                 </div>
                 <input
+                  id="profile-name"
                   type="text"
                   required
                   value={actualName}
                   onChange={(e) => setActualName(e.target.value)}
                   placeholder="e.g. Tan Ah Kow / Mary Lim"
-                  className={`w-full pl-10 pr-3 py-2.5 rounded-xl border text-sm sm:text-base font-semibold focus:outline-none focus:ring-2 ${
-                    isYellow
-                      ? 'bg-neutral-900 border-amber-400 text-amber-300 focus:ring-amber-400'
-                      : 'bg-white border-slate-300 text-slate-900 focus:ring-indigo-500'
-                  }`}
+                  className="input pl-10"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-inherit/80 mb-1.5">
-                Date of Birth (DOB)
-              </label>
+              <label className="label" htmlFor="profile-dob">Date of Birth (DOB)</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <Calendar className="w-4 h-4" />
+                <div className="text-ink-faint pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                  <Calendar className="h-5 w-5" />
                 </div>
                 <input
+                  id="profile-dob"
                   type="date"
                   value={dob}
                   onChange={(e) => setDob(e.target.value)}
-                  className={`w-full pl-10 pr-3 py-2.5 rounded-xl border text-sm sm:text-base font-semibold focus:outline-none focus:ring-2 ${
-                    isYellow
-                      ? 'bg-neutral-900 border-amber-400 text-amber-300 focus:ring-amber-400'
-                      : 'bg-white border-slate-300 text-slate-900 focus:ring-indigo-500'
-                  }`}
+                  className="input pl-10"
                 />
               </div>
             </div>
           </div>
 
           {/* Section 3: Blood Type & Medical Notes */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-inherit/80 mb-1.5">
-                Blood Type (SCDF Ambulance Critical)
-              </label>
+              <label className="label" htmlFor="profile-blood">Blood Type (SCDF Ambulance Critical)</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-rose-500">
-                  <Heart className="w-4 h-4" />
+                <div className="text-brick pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                  <Heart className="h-5 w-5" />
                 </div>
                 <select
+                  id="profile-blood"
                   value={bloodType}
                   onChange={(e) => setBloodType(e.target.value as BloodType)}
-                  className={`w-full pl-10 pr-3 py-2.5 rounded-xl border text-sm sm:text-base font-semibold focus:outline-none focus:ring-2 ${
-                    isYellow
-                      ? 'bg-neutral-900 border-amber-400 text-amber-300 focus:ring-amber-400'
-                      : 'bg-white border-slate-300 text-slate-900 focus:ring-indigo-500'
-                  }`}
+                  className="input pl-10"
                 >
                   {['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'Unknown'].map((bt) => (
                     <option key={bt} value={bt}>
@@ -448,23 +410,18 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-inherit/80 mb-1.5">
-                Medical Notes / Allergies
-              </label>
+              <label className="label" htmlFor="profile-medical">Medical Notes / Allergies</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <FileText className="w-4 h-4" />
+                <div className="text-ink-faint pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                  <FileText className="h-5 w-5" />
                 </div>
                 <input
+                  id="profile-medical"
                   type="text"
                   value={medicalNotes}
                   onChange={(e) => setMedicalNotes(e.target.value)}
                   placeholder="e.g. Diabetic, Penicillin allergy, Pacemaker"
-                  className={`w-full pl-10 pr-3 py-2.5 rounded-xl border text-sm sm:text-base font-medium focus:outline-none focus:ring-2 ${
-                    isYellow
-                      ? 'bg-neutral-900 border-amber-400 text-amber-300 focus:ring-amber-400'
-                      : 'bg-white border-slate-300 text-slate-900 focus:ring-indigo-500'
-                  }`}
+                  className="input pl-10"
                 />
               </div>
             </div>
@@ -472,36 +429,31 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
           {/* Section 4: Home Address */}
           <div>
-            <label className="block text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-inherit/80 mb-1.5">
-              Permanent Home Address (Singapore)
-            </label>
+            <label className="label" htmlFor="profile-address">Permanent Home Address (Singapore)</label>
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-emerald-600">
-                <MapPin className="w-4 h-4" />
+              <div className="text-pine pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                <MapPin className="h-5 w-5" />
               </div>
               <input
+                id="profile-address"
                 type="text"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
                 placeholder="e.g. Blk 480 Lorong 6 Toa Payoh #10-123, Singapore 310480"
-                className={`w-full pl-10 pr-3 py-2.5 rounded-xl border text-sm sm:text-base font-semibold focus:outline-none focus:ring-2 ${
-                  isYellow
-                    ? 'bg-neutral-900 border-amber-400 text-amber-300 focus:ring-amber-400'
-                    : 'bg-white border-slate-300 text-slate-900 focus:ring-indigo-500'
-                }`}
+                className="input pl-10"
               />
             </div>
           </div>
 
           {/* Section 5: Emergency Contacts Preview & Link */}
-          <div className="p-3.5 rounded-xl border border-slate-200 dark:border-neutral-800 bg-slate-50 dark:bg-neutral-900 flex items-center justify-between">
+          <div className="border-line bg-well/60 flex items-center justify-between rounded-xl border p-4">
             <div className="flex items-center gap-2.5">
-              <Users className="w-5 h-5 text-indigo-600 dark:text-amber-400" />
+              <Users className="text-sky h-5 w-5" />
               <div>
-                <div className="font-bold text-xs sm:text-sm">
+                <div className="text-sm font-bold sm:text-base">
                   {contacts.length} Emergency Contacts Configured
                 </div>
-                <div className="text-[11px] text-slate-500 dark:text-inherit/70">
+                <div className="text-ink-soft text-sm">
                   {contacts.map((c) => c.name).slice(0, 2).join(', ')}...
                 </div>
               </div>
@@ -513,17 +465,17 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 onClose();
                 onOpenManageContacts();
               }}
-              className="text-xs font-bold text-indigo-600 dark:text-amber-400 hover:underline"
+              className="text-pine-deep text-sm font-bold hover:underline"
             >
               Edit Contacts →
             </button>
           </div>
 
           {/* Account Metadata / Sign Out */}
-          <div className="pt-2 flex items-center justify-between text-xs text-slate-500 dark:text-inherit/60 border-t border-slate-100 dark:border-neutral-800">
+          <div className="border-line text-ink-soft flex items-center justify-between border-t pt-3 text-sm">
             <div>
               <span>Firestore UID: </span>
-              <code className="font-mono bg-slate-100 dark:bg-neutral-800 px-1 py-0.5 rounded text-[10px]">
+              <code className="bg-well border-line rounded border px-1.5 py-0.5 font-mono text-xs">
                 {user?.uid.slice(0, 14)}...
               </code>
             </div>
@@ -531,25 +483,23 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             <button
               type="button"
               onClick={handleSignOut}
-              className="flex items-center gap-1 text-rose-600 hover:text-rose-700 font-semibold"
+              className="text-brick hover:text-brick-deep flex items-center gap-1 font-bold"
             >
-              <LogOut className="w-3.5 h-3.5" />
+              <LogOut className="h-4 w-4" />
               <span>Sign Out</span>
             </button>
           </div>
         </form>
 
         {/* Footer */}
-        <div className={`p-4 border-t flex items-center justify-between shrink-0 ${
-          isYellow ? 'border-amber-400 bg-neutral-950' : 'border-slate-200 bg-slate-50'
-        }`}>
+        <div className="modal-foot">
           <button
             type="button"
             onClick={() => {
               stopCamera();
               onClose();
             }}
-            className="px-4 py-2.5 rounded-xl border border-slate-300 font-semibold text-xs sm:text-sm hover:bg-slate-100 dark:border-neutral-700"
+            className="btn btn-md btn-secondary"
           >
             Close
           </button>
@@ -558,20 +508,16 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             type="button"
             disabled={isSaving}
             onClick={handleSaveProfile}
-            className={`px-6 py-2.5 rounded-xl font-bold text-sm sm:text-base transition-all flex items-center gap-2 ${
-              isYellow
-                ? 'bg-amber-400 text-black font-extrabold hover:bg-amber-300'
-                : 'bg-emerald-600 text-white hover:bg-emerald-700'
-            } disabled:opacity-50`}
+            className="btn btn-md btn-primary"
           >
             {isSaving ? (
               <>
-                <RefreshCw className="w-4 h-4 animate-spin" />
+                <RefreshCw className="h-5 w-5 animate-spin" />
                 <span>Saving to Firestore...</span>
               </>
             ) : (
               <>
-                <Check className="w-4 h-4" />
+                <Check className="h-5 w-5" />
                 <span>Save Profile to Cloud</span>
               </>
             )}

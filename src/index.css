@@ -1,33 +1,242 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+   Senior SafeSpot Design Suite
+   Type:  Fraunces (display serif — warm, characterful, never cursive)
+          Atkinson Hyperlegible (body — engineered for low-vision readers)
+   Color: warm paper neutrals, deep pine primary, muted brick for SOS.
+   All surfaces run on CSS variables so the high-contrast themes simply
+   re-declare the palette — no per-component conditionals needed.
+--------------------------------------------------------------------------- */
+
+@theme {
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-body: "Atkinson Hyperlegible", Verdana, Tahoma, sans-serif;
+}
+
+@theme inline {
+  --color-bg: var(--ss-bg);
+  --color-surface: var(--ss-surface);
+  --color-well: var(--ss-well);
+  --color-ink: var(--ss-ink);
+  --color-ink-soft: var(--ss-ink-soft);
+  --color-ink-faint: var(--ss-ink-faint);
+  --color-line: var(--ss-line);
+  --color-line-strong: var(--ss-line-strong);
+  --color-pine: var(--ss-pine);
+  --color-pine-deep: var(--ss-pine-deep);
+  --color-pine-soft: var(--ss-pine-soft);
+  --color-on-pine: var(--ss-on-pine);
+  --color-ochre: var(--ss-ochre);
+  --color-ochre-soft: var(--ss-ochre-soft);
+  --color-brick: var(--ss-brick);
+  --color-brick-deep: var(--ss-brick-deep);
+  --color-brick-soft: var(--ss-brick-soft);
+  --color-on-brick: var(--ss-on-brick);
+  --color-sky: var(--ss-sky);
+  --color-sky-soft: var(--ss-sky-soft);
+}
+
+/* --- Default palette: "Paper & Pine" ------------------------------------ */
+:root {
+  --ss-bg: #f3efe6;
+  --ss-surface: #fdfcf8;
+  --ss-well: #eee8da;
+  --ss-ink: #272219;
+  --ss-ink-soft: #5c5546;
+  --ss-ink-faint: #837a69;
+  --ss-line: #e2dbc9;
+  --ss-line-strong: #bfb69e;
+  --ss-pine: #2f6d5b;
+  --ss-pine-deep: #24564a;
+  --ss-pine-soft: #e0ece5;
+  --ss-on-pine: #f6f4ec;
+  --ss-ochre: #86611d;
+  --ss-ochre-soft: #f3e8cf;
+  --ss-brick: #a83a30;
+  --ss-brick-deep: #8a2d25;
+  --ss-brick-soft: #f5e2de;
+  --ss-on-brick: #fbf6f2;
+  --ss-sky: #3c648c;
+  --ss-sky-soft: #e3ebf2;
+}
+
+/* --- High contrast: Yellow on Black -------------------------------------- */
+body.theme-yellow-black {
+  --ss-bg: #000000;
+  --ss-surface: #0c0b08;
+  --ss-well: #191403;
+  --ss-ink: #ffd44d;
+  --ss-ink-soft: #f2c93f;
+  --ss-ink-faint: #cfa93a;
+  --ss-line: #5d4d15;
+  --ss-line-strong: #ffd44d;
+  --ss-pine: #ffc53d;
+  --ss-pine-deep: #ffd76a;
+  --ss-pine-soft: #251d04;
+  --ss-on-pine: #000000;
+  --ss-ochre: #ffd44d;
+  --ss-ochre-soft: #251d04;
+  --ss-brick: #ffd44d;
+  --ss-brick-deep: #ffe083;
+  --ss-brick-soft: #251d04;
+  --ss-on-brick: #000000;
+  --ss-sky: #ffd44d;
+  --ss-sky-soft: #251d04;
+}
+
+/* --- High contrast: Black on White --------------------------------------- */
+body.theme-black-white {
+  --ss-bg: #ffffff;
+  --ss-surface: #ffffff;
+  --ss-well: #ededed;
+  --ss-ink: #000000;
+  --ss-ink-soft: #141414;
+  --ss-ink-faint: #333333;
+  --ss-line: #767676;
+  --ss-line-strong: #000000;
+  --ss-pine: #000000;
+  --ss-pine-deep: #262626;
+  --ss-pine-soft: #e6e6e6;
+  --ss-on-pine: #ffffff;
+  --ss-ochre: #000000;
+  --ss-ochre-soft: #e6e6e6;
+  --ss-brick: #000000;
+  --ss-brick-deep: #262626;
+  --ss-brick-soft: #e6e6e6;
+  --ss-on-brick: #ffffff;
+  --ss-sky: #000000;
+  --ss-sky-soft: #e6e6e6;
+}
+
+/* --- Gentle warm theme ---------------------------------------------------- */
+body.theme-warm-soft {
+  --ss-bg: #faf5ea;
+  --ss-surface: #fffcf4;
+  --ss-well: #f2ebdb;
+  --ss-ink: #2d251a;
+  --ss-ink-soft: #5d5342;
+  --ss-ink-faint: #847964;
+  --ss-line: #e6dbc3;
+  --ss-line-strong: #c4b493;
+  --ss-pine: #6d5127;
+  --ss-pine-deep: #57401e;
+  --ss-pine-soft: #f0e6d0;
+  --ss-on-pine: #fff9ec;
+  --ss-ochre: #7a5a20;
+  --ss-ochre-soft: #f0e6d0;
+  --ss-brick: #9c4a3c;
+  --ss-brick-deep: #7f3a2e;
+  --ss-brick-soft: #f4e3dd;
+  --ss-on-brick: #fff6f2;
+  --ss-sky: #4a6076;
+  --ss-sky-soft: #e6ebef;
+}
+
+/* --- Base ------------------------------------------------------------------ */
 @layer base {
+  html {
+    font-size: 100%; /* standard */
+  }
+  html[data-fs="large"] {
+    font-size: 112.5%; /* senior default: 18px root */
+  }
+  html[data-fs="extra-large"] {
+    font-size: 125%; /* 20px root */
+  }
+
   body {
-    @apply antialiased text-slate-900 bg-slate-50 selection:bg-indigo-100 selection:text-indigo-900 font-sans;
+    @apply bg-bg font-body text-ink antialiased;
+    line-height: 1.6;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  ::selection {
+    background: var(--ss-pine-soft);
+    color: var(--ss-ink);
+  }
+
+  h1, h2, h3, h4 {
+    @apply font-display;
+    line-height: 1.2;
   }
 }
 
-/* Accessible High Contrast Themes */
-body.theme-yellow-black {
-  background-color: #000000 !important;
-  color: #fbbf24 !important;
+/* --- Components ------------------------------------------------------------- */
+@layer components {
+  .card {
+    @apply rounded-2xl border border-line bg-surface;
+    box-shadow:
+      0 1px 2px rgb(39 34 25 / 0.05),
+      0 10px 28px -16px rgb(39 34 25 / 0.18);
+  }
+
+  .btn {
+    @apply inline-flex select-none items-center justify-center gap-2 rounded-xl font-body font-bold transition-all duration-150 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50;
+  }
+  .btn:focus-visible {
+    outline: 3px solid var(--ss-pine);
+    outline-offset: 2px;
+  }
+
+  .btn-md {
+    @apply min-h-12 px-4 py-2.5 text-sm sm:text-base;
+  }
+  .btn-lg {
+    @apply min-h-14 px-6 py-3.5 text-base sm:text-lg;
+  }
+
+  .btn-primary {
+    @apply bg-pine text-on-pine shadow-sm hover:bg-pine-deep;
+  }
+  .btn-secondary {
+    @apply border border-line-strong/70 bg-surface text-ink shadow-xs hover:bg-well;
+  }
+  .btn-danger {
+    @apply bg-brick text-on-brick shadow-sm hover:bg-brick-deep;
+  }
+  .btn-soft {
+    @apply bg-pine-soft text-pine-deep hover:bg-line/60;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold;
+  }
+
+  .icon-tile {
+    @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-pine text-on-pine;
+  }
+
+  .label {
+    @apply mb-1.5 block text-sm font-bold text-ink-soft;
+  }
+
+  .input {
+    @apply w-full rounded-xl border border-line-strong/70 bg-surface px-4 py-3 text-base font-semibold text-ink transition-colors placeholder:font-normal placeholder:text-ink-faint focus:border-pine focus:ring-2 focus:ring-pine/30 focus:outline-none;
+  }
+
+  .modal-backdrop {
+    @apply fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-ink/50 p-3 backdrop-blur-sm sm:p-5;
+  }
+  .modal-panel {
+    @apply my-auto flex max-h-[92vh] w-full flex-col overflow-hidden rounded-2xl border border-line bg-surface;
+    box-shadow:
+      0 1px 2px rgb(39 34 25 / 0.05),
+      0 10px 28px -16px rgb(39 34 25 / 0.18);
+  }
+  .modal-head {
+    @apply flex shrink-0 items-center justify-between gap-3 border-b border-line bg-well/60 px-4 py-4 sm:px-5;
+  }
+  .modal-foot {
+    @apply flex shrink-0 items-center justify-between gap-3 border-t border-line bg-well/60 px-4 py-4 sm:px-5;
+  }
+
+  .section-kicker {
+    @apply text-xs font-bold tracking-wide text-ink-faint uppercase;
+  }
 }
 
-body.theme-yellow-black * {
-  border-color: #fbbf24 !important;
-}
-
-body.theme-black-white {
-  background-color: #ffffff !important;
-  color: #000000 !important;
-}
-
-body.theme-warm-soft {
-  background-color: #fbf7ee !important;
-  color: #27221d !important;
-}
-
-/* Touch targets and accessibility minimums */
+/* --- Touch targets & accessibility minimums -------------------------------- */
 .accessible-tap {
   min-height: 48px;
   min-width: 48px;
@@ -43,22 +252,19 @@ body.theme-warm-soft {
   justify-content: center;
 }
 
-/* Custom scrollbars for clean accessibility */
+/* --- Warm scrollbars --------------------------------------------------------- */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
-
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: var(--ss-bg);
 }
-
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--ss-line-strong);
   border-radius: 9999px;
+  border: 2px solid var(--ss-bg);
 }
-
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: var(--ss-ink-faint);
 }
-

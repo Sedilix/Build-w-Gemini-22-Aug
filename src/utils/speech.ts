@@ -4,6 +4,12 @@
  */
 
 // Safe Text-to-Speech (TTS) engine optimized for elderly listeners
+import { SPEECHMATICS_VOICE_OPTIONS, Language } from '../types';
+import { speechLocaleFor } from '../locales/translations';
+
+// Voice IDs currently supported by the Speechmatics TTS preview API
+const VALID_TTS_VOICE_IDS = new Set(SPEECHMATICS_VOICE_OPTIONS.map((v) => v.id));
+
 let currentAudioElement: HTMLAudioElement | null = null;
 
 // Helper: Strip markdown formatting, emojis, URLs, and asterisks for smooth TTS audio
@@ -21,7 +27,8 @@ export async function speakSpeechmaticsOrFallback(
   text: string, 
   voice: string = 'sarah', 
   onEnd?: () => void,
-  rate: number = 0.9
+  rate: number = 0.9,
+  language: Language = 'en'
 ): Promise<void> {
   stopSpeaking();
 
@@ -31,11 +38,23 @@ export async function speakSpeechmaticsOrFallback(
     return;
   }
 
+  // Speechmatics TTS preview only synthesizes English. For Mandarin, Malay,
+  // and Tamil readouts we route straight to native Web Speech synthesis with
+  // the matching locale so elders hear their own language, not English TTS.
+  if (language !== 'en') {
+    speakText(sanitized, onEnd, speechLocaleFor(language));
+    return;
+  }
+
   try {
+    // Guard against stale/invalid persisted voice IDs so we never hit an
+    // unknown Speechmatics voice (which would silently fall back to Web Speech).
+    const safeVoice = VALID_TTS_VOICE_IDS.has(voice) ? voice : 'sarah';
+
     const res = await fetch('/api/speechmatics/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: sanitized, voice }),
+      body: JSON.stringify({ text: sanitized, voice: safeVoice }),
     });
 
     if (res.ok) {
@@ -69,6 +88,9 @@ export async function speakSpeechmaticsOrFallback(
 
       await audio.play();
       return;
+    } else {
+      const errBody = await res.text().catch(() => '');
+      console.warn(`Speechmatics TTS returned ${res.status} for voice "${safeVoice}":`, errBody);
     }
   } catch (err) {
     console.warn('Speechmatics TTS unavailable, falling back to Web Speech synthesis:', err);
@@ -78,7 +100,7 @@ export async function speakSpeechmaticsOrFallback(
   speakText(sanitized, onEnd);
 }
 
-export function speakText(text: string, onEnd?: () => void): boolean {
+export function speakText(text: string, onEnd?: () => void, locale: string = 'en-SG'): boolean {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
     console.warn('Speech synthesis not supported on this device.');
     if (onEnd) onEnd();
@@ -89,15 +111,17 @@ export function speakText(text: string, onEnd?: () => void): boolean {
     window.speechSynthesis.cancel(); // Stop any pending speech
 
     const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = locale;
     utterance.rate = 0.88; // Slower, clearer cadence for older ears
     utterance.pitch = 1.0;
     utterance.volume = 1.0;
 
-    // Pick a natural sounding voice if available
+    // Pick a natural sounding voice matching the target locale if available
+    const langPrefix = locale.split('-')[0].toLowerCase();
     const voices = window.speechSynthesis.getVoices();
     const preferredVoice = voices.find(
-      (v) => (v.lang.startsWith('en') && (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Samantha') || v.name.includes('Premium')))
-    ) || voices.find((v) => v.lang.startsWith('en'));
+      (v) => (v.lang.toLowerCase().startsWith(langPrefix) && (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Samantha') || v.name.includes('Premium')))
+    ) || voices.find((v) => v.lang.toLowerCase().startsWith(langPrefix));
 
     if (preferredVoice) {
       utterance.voice = preferredVoice;

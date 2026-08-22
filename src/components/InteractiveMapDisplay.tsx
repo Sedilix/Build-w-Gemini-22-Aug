@@ -8,12 +8,8 @@ import {
   MapPin, 
   Navigation, 
   Compass, 
-  Layers, 
-  ZoomIn, 
-  ZoomOut, 
   ExternalLink, 
-  ShieldCheck,
-  Maximize2
+  ShieldCheck
 } from 'lucide-react';
 import { APIProvider, Map, AdvancedMarker, Pin } from '@vis.gl/react-google-maps';
 import { GPSLocation, LocationVerificationResult, AccessibilitySettings } from '../types';
@@ -29,11 +25,11 @@ export const InteractiveMapDisplay: React.FC<InteractiveMapDisplayProps> = ({
   verification,
   settings,
 }) => {
-  const [zoom, setZoom] = useState(17);
-  const [mapType, setMapType] = useState<'roadmap' | 'satellite'>('roadmap');
   const [dynamicKey, setDynamicKey] = useState<string>(() => {
     return ((import.meta as any)?.env?.VITE_GOOGLE_MAPS_API_KEY as string) || '';
   });
+
+  void settings;
 
   useEffect(() => {
     if (!dynamicKey) {
@@ -48,8 +44,6 @@ export const InteractiveMapDisplay: React.FC<InteractiveMapDisplayProps> = ({
     }
   }, [dynamicKey]);
 
-  const isYellow = settings.contrastTheme === 'yellow-black';
-
   const lat = verification?.verifiedCoordinates?.lat ?? gps?.latitude ?? 1.3327;
   const lng = verification?.verifiedCoordinates?.lng ?? gps?.longitude ?? 103.8479;
   const address = verification?.formattedAddress || 'Locating current spot in Singapore...';
@@ -62,71 +56,51 @@ export const InteractiveMapDisplay: React.FC<InteractiveMapDisplayProps> = ({
   };
 
   return (
-    <section
-      id="card-interactive-map"
-      className={`rounded-2xl p-6 sm:p-7 border transition-all shadow-xs ${
-        isYellow
-          ? 'bg-black text-amber-300 border-amber-400'
-          : settings.contrastTheme === 'black-white'
-          ? 'bg-white text-black border-black'
-          : settings.contrastTheme === 'warm-soft'
-          ? 'bg-[#fffaf3] text-[#2c241c] border-[#dfd2c4]'
-          : 'bg-white text-slate-900 border-slate-200/90'
-      }`}
-    >
+    <section id="card-interactive-map" className="card p-6 sm:p-7">
       {/* Header bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-            isYellow ? 'bg-amber-400 text-black' : 'bg-slate-900 text-white'
-          }`}>
-            <Navigation className="w-5 h-5" />
+          <div className="icon-tile">
+            <Navigation className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-xl sm:text-2xl font-bold tracking-tight leading-none text-slate-900 dark:text-inherit">
+            <h3 className="font-display text-2xl leading-none font-bold tracking-tight">
               Live Map & Navigation Pin
             </h3>
-            <p className="text-xs sm:text-sm font-normal text-slate-500 dark:text-inherit/75 mt-1">
+            <p className="text-ink-soft mt-1 text-sm font-normal sm:text-base">
               Precision coordinate: {lat.toFixed(5)}, {lng.toFixed(5)}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={openInGoogleMaps}
-            className="accessible-tap px-3.5 py-1.5 rounded-xl font-semibold text-xs sm:text-sm border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 transition-all shadow-2xs"
-            title="Open coordinates in external Google Maps application"
-          >
-            <span>Open in Full App</span>
-            <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
-          </button>
-        </div>
+        <button onClick={openInGoogleMaps} className="btn btn-md btn-secondary" title="Open coordinates in external Google Maps application">
+          <span>Open in Full App</span>
+          <ExternalLink className="text-ink-soft h-4 w-4" />
+        </button>
       </div>
 
       {/* Map Container */}
-      <div className="relative rounded-xl overflow-hidden border border-slate-200 dark:border-neutral-700 bg-slate-950 h-72 sm:h-96 w-full shadow-inner">
+      <div className="border-line-strong/60 relative h-72 w-full overflow-hidden rounded-xl border-2 bg-slate-950 shadow-inner sm:h-96">
         {mapsApiKey ? (
           <APIProvider apiKey={mapsApiKey}>
             <Map
               defaultCenter={{ lat, lng }}
               center={{ lat, lng }}
-              defaultZoom={zoom}
-              zoom={zoom}
+              defaultZoom={17}
+              zoom={17}
               mapId="DEMO_MAP_ID"
               internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
               disableDefaultUI={false}
               style={{ width: '100%', height: '100%' }}
             >
               <AdvancedMarker position={{ lat, lng }}>
-                <Pin background="#059669" glyphColor="#ffffff" borderColor="#047857" scale={1.3} />
+                <Pin background="#2f6d5b" glyphColor="#f6f4ec" borderColor="#24564a" scale={1.3} />
               </AdvancedMarker>
             </Map>
           </APIProvider>
         ) : (
-          /* High-Contrast Interactive Visual Canvas Map View */
-          <div className="relative w-full h-full">
-            {/* OpenStreetMap / Carto Tile layer */}
+          /* Fallback interactive tile map with verified pin overlay */
+          <div className="relative h-full w-full">
             <iframe
               title="Interactive Pickup Map"
               width="100%"
@@ -136,36 +110,36 @@ export const InteractiveMapDisplay: React.FC<InteractiveMapDisplayProps> = ({
               marginHeight={0}
               marginWidth={0}
               src={`https://www.openstreetmap.org/export/embed.html?bbox=${lng - 0.003}%2C${lat - 0.002}%2C${lng + 0.003}%2C${lat + 0.002}&layer=mapnik&marker=${lat}%2C${lng}`}
-              className="w-full h-full filter contrast-105"
+              className="h-full w-full"
             />
 
             {/* Custom Overlay Pin & Pulsing Radius */}
-            <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
               <div className="relative flex items-center justify-center">
-                <div className="w-20 h-20 rounded-full bg-emerald-500/20 border-2 border-emerald-500 animate-ping absolute"></div>
-                <div className="w-14 h-14 rounded-full bg-emerald-500/30 border border-emerald-600 absolute"></div>
-                <div className="z-10 p-2 rounded-full bg-emerald-600 text-white shadow-xl border-2 border-white transform -translate-y-3">
-                  <MapPin className="w-7 h-7" />
+                <div className="bg-pine/20 border-pine absolute h-20 w-20 animate-ping rounded-full border-2"></div>
+                <div className="bg-pine/30 border-pine-deep absolute h-14 w-14 rounded-full border"></div>
+                <div className="bg-pine text-on-pine z-10 -translate-y-3 rounded-full border-2 border-white p-2 shadow-xl">
+                  <MapPin className="h-7 w-7" />
                 </div>
               </div>
             </div>
 
             {/* In-Map Info Overlay Pill */}
-            <div className="absolute top-3 left-3 right-3 sm:right-auto bg-black/85 backdrop-blur-md text-white px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold border border-white/20 shadow-md flex items-center gap-2 pointer-events-auto">
-              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+            <div className="absolute top-3 left-3 right-3 flex items-center gap-2 rounded-xl border border-white/20 bg-black/85 px-3.5 py-2 text-sm font-semibold text-white shadow-md backdrop-blur-md sm:right-auto">
+              <ShieldCheck className="h-5 w-5 shrink-0 text-emerald-400" />
               <div className="truncate">
                 <span className="text-emerald-400">Verified Pin:</span> {address}
               </div>
             </div>
 
             {/* Zoom / Re-center Overlay Controls */}
-            <div className="absolute bottom-3 right-3 flex flex-col gap-1.5 pointer-events-auto">
+            <div className="pointer-events-auto absolute bottom-3 right-3 flex flex-col gap-1.5">
               <button
                 onClick={openInGoogleMaps}
-                className="px-3 py-2 rounded-xl bg-white text-slate-900 hover:bg-slate-50 shadow-md font-semibold text-xs flex items-center gap-1.5 border border-slate-200"
+                className="btn btn-md border-line bg-surface text-ink hover:bg-well border shadow-md"
                 title="Open directly in Google Maps"
               >
-                <ExternalLink className="w-3.5 h-3.5 text-blue-600" />
+                <ExternalLink className="text-sky h-4 w-4" />
                 <span>Google Maps</span>
               </button>
             </div>
@@ -174,9 +148,9 @@ export const InteractiveMapDisplay: React.FC<InteractiveMapDisplayProps> = ({
       </div>
 
       {/* Driver Coordinates & Notes bar */}
-      <div className="mt-3.5 flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm font-medium text-slate-500 dark:text-inherit/80">
+      <div className="text-ink-soft mt-3.5 flex flex-wrap items-center justify-between gap-2 text-sm font-semibold sm:text-base">
         <div className="flex items-center gap-1.5">
-          <Compass className="w-4 h-4 text-emerald-600" />
+          <Compass className="text-pine h-5 w-5" />
           <span>Coordinates: {lat.toFixed(6)}, {lng.toFixed(6)}</span>
         </div>
         <div>

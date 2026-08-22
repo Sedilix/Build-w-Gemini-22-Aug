@@ -9,16 +9,16 @@ import {
   Volume2, 
   VolumeX, 
   Mic, 
-  AlertTriangle, 
+  Siren, 
   Settings, 
-  SunMedium, 
-  Sparkles,
   Type,
+  Languages,
   User as UserIcon,
   LogIn
 } from 'lucide-react';
 import { AccessibilitySettings, HighContrastTheme, FontSizeLevel, UserProfile } from '../types';
 import { User as FirebaseUser } from 'firebase/auth';
+import { t, LANGUAGE_OPTIONS } from '../locales/translations';
 
 interface HeaderAccessibilityProps {
   settings: AccessibilitySettings;
@@ -66,101 +66,94 @@ export const HeaderAccessibility: React.FC<HeaderAccessibilityProps> = ({
     onUpdateSettings((prev) => ({ ...prev, spokenGuidance: !prev.spokenGuidance }));
   };
 
-  const isHighContrastYellow = settings.contrastTheme === 'yellow-black';
+  const lang = settings.language || 'en';
+
+  // One-tap language cycle: English → 中文 → Melayu → தமிழ் → English...
+  const cycleLanguage = () => {
+    const order = LANGUAGE_OPTIONS.map((l) => l.id);
+    const nextIndex = (order.indexOf(lang) + 1) % order.length;
+    onUpdateSettings((prev) => ({ ...prev, language: order[nextIndex] }));
+  };
+
+  const currentLang = LANGUAGE_OPTIONS.find((l) => l.id === lang) || LANGUAGE_OPTIONS[0];
 
   return (
     <header 
       id="app-header-accessibility"
-      className={`border-b sticky top-0 z-40 px-4 sm:px-8 py-3.5 transition-colors backdrop-blur-md ${
-        isHighContrastYellow 
-          ? 'bg-black text-amber-300 border-amber-400' 
-          : settings.contrastTheme === 'black-white'
-          ? 'bg-white text-black border-black'
-          : settings.contrastTheme === 'warm-soft'
-          ? 'bg-[#f4ebe1] text-[#2c241c] border-[#d8c8b8]'
-          : 'bg-white/95 text-slate-900 border-slate-200/80 shadow-xs'
-      }`}
+      className="border-line bg-surface/95 text-ink sticky top-0 z-40 border-b px-4 py-3.5 backdrop-blur-md transition-colors sm:px-8"
     >
-      <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
-        {/* Brand / Title with Friendly Elder Badge */}
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-6 gap-y-3">
+        {/* Brand */}
         <div className="flex items-center gap-3.5">
-          <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-2xl shadow-xs shrink-0 ${
-            isHighContrastYellow ? 'bg-amber-400 text-black' : 'bg-slate-900 text-white'
-          }`}>
-            📍
-          </div>
+          <div className="icon-tile h-12 w-12 rounded-2xl text-2xl">📍</div>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight leading-none text-slate-900 dark:text-inherit">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="font-display text-2xl leading-none font-bold tracking-tight sm:text-[1.7rem]">
                 Senior SafeSpot
               </h1>
-              <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-semibold uppercase tracking-wider ${
-                isHighContrastYellow 
-                  ? 'bg-amber-400 text-black' 
-                  : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-              }`}>
+              <span className="chip border-pine/40 bg-pine-soft text-pine-deep">
                 Singapore • 995 SOS
               </span>
             </div>
-            <p className="text-xs sm:text-sm font-normal text-slate-500 dark:text-inherit/80 mt-1">
-              Verified GPS • Google Street View AI • 1-Tap SG Family Alerts
+            <p className="text-ink-soft mt-1 text-sm font-normal sm:text-base">
+              {t('header.tagline', lang)}
             </p>
           </div>
         </div>
 
         {/* Quick Accessibility & Action Controls */}
         <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+          {/* One-Tap Language Switcher (EN / 中文 / Melayu / தமிழ்) */}
+          <button
+            id="btn-language-switcher"
+            onClick={cycleLanguage}
+            className="btn btn-md btn-secondary"
+            title={`${t('header.language', lang)}: ${LANGUAGE_OPTIONS.map((l) => l.nativeName).join(' / ')}`}
+            aria-label={`Change language, current: ${currentLang.englishName}`}
+          >
+            <Languages className="text-ink-soft h-5 w-5" />
+            <span>{currentLang.nativeName}</span>
+          </button>
+
           {/* Voice Command Mode Trigger */}
           <button
             id="btn-voice-assistant-trigger"
             onClick={onOpenVoiceCommand}
-            className={`accessible-tap px-4 py-2 rounded-xl font-semibold flex items-center gap-2 text-sm sm:text-base transition-all active:scale-98 shadow-xs ${
-              isHighContrastYellow
-                ? 'bg-amber-300 text-black border-2 border-amber-300 hover:bg-amber-400 font-bold'
-                : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-100'
-            }`}
+            className="btn btn-md btn-primary"
             title="Voice Commands (Say 'Where am I' or 'Send location')"
             aria-label="Activate voice commands"
           >
-            <Mic className="w-4 h-4 animate-pulse" />
-            <span className="font-semibold">Voice Assistant</span>
+            <Mic className="h-5 w-5" />
+            <span>{t('header.voiceAssistant', lang)}</span>
           </button>
 
           {/* Voice Speech Audio Toggle */}
           <button
             id="btn-toggle-speech-guidance"
             onClick={toggleVoiceGuidance}
-            className={`accessible-tap px-3.5 py-2 rounded-xl font-medium flex items-center gap-1.5 text-sm sm:text-base border transition-all ${
+            className={`btn btn-md ${
               settings.spokenGuidance
-                ? isHighContrastYellow
-                  ? 'bg-amber-400 text-black border-amber-400 font-bold'
-                  : 'bg-emerald-50 text-emerald-800 border-emerald-200 font-semibold'
-                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                ? 'border-pine/40 bg-pine-soft text-pine-deep'
+                : 'btn-secondary text-ink-soft'
             }`}
             title={settings.spokenGuidance ? 'Voice Speech Guidance Active (Tap to mute)' : 'Turn Voice Guidance On'}
           >
-            {settings.spokenGuidance ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-            <span className="hidden md:inline text-xs font-semibold">
-              {settings.spokenGuidance ? 'Voice On' : 'Voice Off'}
-            </span>
+            {settings.spokenGuidance ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
+            <span>{settings.spokenGuidance ? t('header.voiceOn', lang) : t('header.voiceOff', lang)}</span>
           </button>
 
           {/* Settings & Speechmatics Voice Config Button */}
           <button
             id="btn-open-settings-modal"
             onClick={onOpenSettings}
-            className={`accessible-tap px-3.5 py-2 rounded-xl font-semibold flex items-center gap-1.5 text-sm sm:text-base border transition-all active:scale-98 ${
-              isHighContrastYellow
-                ? 'bg-neutral-900 border-amber-400 text-amber-300 hover:bg-neutral-800 font-bold'
-                : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-200 shadow-2xs'
-            }`}
+            className="btn btn-md btn-secondary"
             title="Open Speechmatics Voices & Accessibility Settings"
             aria-label="Settings and Speechmatics voice selection"
           >
-            <Settings className="w-4 h-4 text-slate-600 dark:text-inherit" />
-            <span className="hidden sm:inline text-xs font-bold">Settings</span>
-            <span className="text-[10px] uppercase font-bold px-1.5 py-0.2 rounded-md bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-              {settings.speechmaticsVoice ? settings.speechmaticsVoice.toUpperCase() : 'SARAH'}
+            <Settings className="text-ink-soft h-5 w-5" />
+            <span>{t('header.settings', lang)}</span>
+            <span className="chip border-pine/40 bg-pine-soft text-pine-deep px-2 py-0.5 text-[11px] uppercase">
+              {settings.speechmaticsVoice ? settings.speechmaticsVoice : 'sarah'}
             </span>
           </button>
 
@@ -168,27 +161,24 @@ export const HeaderAccessibility: React.FC<HeaderAccessibilityProps> = ({
           <button
             id="btn-toggle-contrast-mode"
             onClick={toggleTheme}
-            className={`accessible-tap px-3.5 py-2 rounded-xl font-medium flex items-center gap-1.5 text-sm sm:text-base border transition-all ${
-              isHighContrastYellow
-                ? 'bg-amber-300 text-black border-amber-300 font-bold'
-                : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200 shadow-2xs'
-            }`}
+            className="btn btn-md btn-secondary"
             title="Toggle High Contrast Display Mode"
           >
-            <Eye className="w-4 h-4 text-slate-500 dark:text-inherit" />
-            <span className="hidden sm:inline text-xs font-semibold">Contrast</span>
+            <Eye className="text-ink-soft h-5 w-5" />
+            <span>{t('header.contrast', lang)}</span>
           </button>
 
           {/* Font Size Adjuster */}
           <button
             id="btn-toggle-font-size"
             onClick={toggleFontSize}
-            className="accessible-tap px-3.5 py-2 rounded-xl font-semibold flex items-center gap-1 text-sm border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-2xs transition-all"
+            className="btn btn-md btn-secondary"
             title="Increase or reset text size"
           >
-            <Type className="w-4 h-4 text-slate-500" />
-            <span className="text-xs uppercase font-bold text-slate-800">
-              {settings.fontSize === 'extra-large' ? 'XL' : settings.fontSize === 'large' ? 'LG' : 'MD'}
+            <Type className="text-ink-soft h-5 w-5" />
+            <span>
+              Text:{' '}
+              {settings.fontSize === 'extra-large' ? 'XL' : settings.fontSize === 'large' ? 'Large' : 'Med'}
             </span>
           </button>
 
@@ -197,29 +187,25 @@ export const HeaderAccessibility: React.FC<HeaderAccessibilityProps> = ({
             <button
               id="btn-open-user-profile"
               onClick={onOpenProfile}
-              className={`accessible-tap px-3 py-1.5 rounded-xl font-bold flex items-center gap-2 text-xs sm:text-sm border transition-all active:scale-98 shadow-2xs ${
-                isHighContrastYellow
-                  ? 'bg-neutral-900 border-amber-400 text-amber-300 hover:bg-neutral-800'
-                  : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-200'
-              }`}
+              className="btn btn-md btn-secondary"
               title="Open User Medical Profile & Emergency Contacts"
             >
               {profile?.selfiePhotoUrl ? (
                 <img
                   src={profile.selfiePhotoUrl}
                   alt="Selfie"
-                  className="w-6 h-6 rounded-full object-cover border border-emerald-500"
+                  className="border-pine h-7 w-7 rounded-full border-2 object-cover"
                 />
               ) : (
-                <div className="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs">
-                  {profile?.actualName?.charAt(0) || user.displayName?.charAt(0) || '👤'}
-                </div>
+                <span className="bg-pine text-on-pine flex h-7 w-7 items-center justify-center rounded-full text-sm">
+                  {profile?.actualName?.charAt(0) || user.displayName?.charAt(0) || <UserIcon className="h-4 w-4" />}
+                </span>
               )}
-              <span className="max-w-[100px] truncate hidden sm:inline font-bold">
+              <span className="max-w-[110px] truncate">
                 {profile?.actualName || user.displayName || (user.isAnonymous ? 'Guest' : 'My Profile')}
               </span>
               {profile?.bloodType && profile.bloodType !== 'Unknown' && (
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-200">
+                <span className="chip border-brick/40 bg-brick-soft text-brick-deep px-2 py-0.5 text-[11px]">
                   {profile.bloodType}
                 </span>
               )}
@@ -228,15 +214,11 @@ export const HeaderAccessibility: React.FC<HeaderAccessibilityProps> = ({
             <button
               id="btn-open-auth-modal"
               onClick={onOpenAuth}
-              className={`accessible-tap px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 text-xs sm:text-sm border transition-all active:scale-98 shadow-2xs ${
-                isHighContrastYellow
-                  ? 'bg-amber-400 text-black border-amber-400'
-                  : 'bg-slate-900 text-white hover:bg-slate-800'
-              }`}
+              className="btn btn-md bg-ink text-bg hover:bg-ink-soft"
               title="Sign In with Google or Phone"
             >
-              <LogIn className="w-4 h-4" />
-              <span>Sign In</span>
+              <LogIn className="h-5 w-5" />
+              <span>{t('header.signIn', lang)}</span>
             </button>
           )}
 
@@ -244,11 +226,11 @@ export const HeaderAccessibility: React.FC<HeaderAccessibilityProps> = ({
           <button
             id="btn-emergency-911-header"
             onClick={onEmergencyTrigger}
-            className="accessible-tap px-4 py-2 rounded-xl font-bold flex items-center gap-1.5 text-sm sm:text-base bg-rose-600 hover:bg-rose-700 active:scale-98 text-white shadow-xs transition-all border border-rose-700"
+            className="btn btn-md btn-danger min-w-[8.5rem]"
             title="Immediate Singapore SCDF 995 Emergency Dispatch Call & Location Send"
           >
-            <AlertTriangle className="w-4 h-4 animate-bounce" />
-            <span className="font-bold">SOS 995</span>
+            <Siren className="h-5 w-5" />
+            <span>{t('header.sos', lang)}</span>
           </button>
         </div>
       </div>

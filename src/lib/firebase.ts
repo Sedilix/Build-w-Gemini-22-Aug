@@ -18,6 +18,9 @@ import {
 } from 'firebase/auth';
 import { 
   getFirestore, 
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   doc, 
   getDoc, 
   setDoc, 
@@ -26,7 +29,7 @@ import {
   onSnapshot,
   serverTimestamp 
 } from 'firebase/firestore';
-import { UserProfile, EmergencyContact } from '../types';
+import { UserProfile, EmergencyContact, Incident } from '../types';
 
 export const firebaseConfig = {
   apiKey: (import.meta as any).env?.VITE_FIREBASE_API_KEY || '',
@@ -41,7 +44,28 @@ export const firebaseConfig = {
 // Initialize Firebase App singleton
 export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+
+/**
+ * Firestore with offline IndexedDB persistent cache so the elder's medical
+ * profile, emergency contacts, and active incidents stay fully usable in
+ * underground MRT stations or HDB void decks with poor reception.
+ * Falls back to the default in-memory instance if the cache cannot init
+ * (e.g. another tab already claimed single-tab cache in an older session).
+ */
+function createFirestore() {
+  try {
+    return initializeFirestore(app, {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager(),
+      }),
+    });
+  } catch (err) {
+    console.warn('Persistent Firestore cache unavailable, using default:', err);
+    return getFirestore(app);
+  }
+}
+
+export const db = createFirestore();
 export const googleProvider = new GoogleAuthProvider();
 
 // Google Sign-In
@@ -159,6 +183,57 @@ export function subscribeToUserProfile(
     }
   }, (err) => {
     console.warn('Firestore profile subscription error:', err);
+    callback(null);
+  });
+}
+
+// Collection reference: Incidents (live caregiver tracking)
+const INCIDENTS_COLLECTION = 'Incidents';
+
+/**
+ * Create a new live incident doc at `Incidents/{incidentId}` and return its ID.
+ * The elder's device then streams live GPS + battery into this doc so family
+ * can follow `/track/:incidentId` without installing an app.
+ */
+export async function createIncident(incident: Omit<Incident, 'incidentId'>): Promise<string> {
+  const incidentDocRef = doc(collection(db, INCIDENTS_COLLECTION));
+  const incidentId = incidentDocRef.id;
+  const payload: Incident = { ...incident, incidentId };
+  await setDoc(incidentDocRef, payload);
+  return incidentId;
+}
+
+/**
+ * Merge-update an existing incident (live GPS ticks, battery, status changes).
+ */
+export async function updateIncident(
+  incidentId: string, 
+  updates: Partial<Incident>
+): Promise<void> {
+  try {
+    const incidentDocRef = doc(db, INCIDENTS_COLLECTION, incidentId);
+    await updateDoc(incidentDocRef, { ...updates, updatedAt: Date.now() });
+  } catch (error) {
+    console.warn('Error updating incident (may be offline, will retry):', error);
+  }
+}
+
+/**
+ * Real-time subscription used by the `/track/:incidentId` caregiver dashboard.
+ */
+export function subscribeToIncident(
+  incidentId: string, 
+  callback: (incident: Incident | null) => void
+): () => void {
+  const incidentDocRef = doc(db, INCIDENTS_COLLECTION, incidentId);
+  return onSnapshot(incidentDocRef, (snap) => {
+    if (snap.exists()) {
+      callback(snap.data() as Incident);
+    } else {
+      callback(null);
+    }
+  }, (err) => {
+    console.warn('Firestore incident subscription error:', err);
     callback(null);
   });
 }
