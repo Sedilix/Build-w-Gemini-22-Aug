@@ -13,9 +13,12 @@ import {
   Settings, 
   SunMedium, 
   Sparkles,
-  Type
+  Type,
+  User as UserIcon,
+  LogIn
 } from 'lucide-react';
-import { AccessibilitySettings, HighContrastTheme, FontSizeLevel } from '../types';
+import { AccessibilitySettings, HighContrastTheme, FontSizeLevel, UserProfile } from '../types';
+import { User as FirebaseUser } from 'firebase/auth';
 
 interface HeaderAccessibilityProps {
   settings: AccessibilitySettings;
@@ -23,6 +26,10 @@ interface HeaderAccessibilityProps {
   onOpenVoiceCommand: () => void;
   onEmergencyTrigger: () => void;
   onOpenSettings: () => void;
+  onOpenProfile: () => void;
+  onOpenAuth: () => void;
+  user: FirebaseUser | null;
+  profile: UserProfile | null;
   isSpeaking: boolean;
   onStopSpeaking: () => void;
 }
@@ -33,6 +40,10 @@ export const HeaderAccessibility: React.FC<HeaderAccessibilityProps> = ({
   onOpenVoiceCommand,
   onEmergencyTrigger,
   onOpenSettings,
+  onOpenProfile,
+  onOpenAuth,
+  user,
+  profile,
   isSpeaking,
   onStopSpeaking,
 }) => {
@@ -180,6 +191,54 @@ export const HeaderAccessibility: React.FC<HeaderAccessibilityProps> = ({
               {settings.fontSize === 'extra-large' ? 'XL' : settings.fontSize === 'large' ? 'LG' : 'MD'}
             </span>
           </button>
+
+          {/* User Profile / Auth Button */}
+          {user ? (
+            <button
+              id="btn-open-user-profile"
+              onClick={onOpenProfile}
+              className={`accessible-tap px-3 py-1.5 rounded-xl font-bold flex items-center gap-2 text-xs sm:text-sm border transition-all active:scale-98 shadow-2xs ${
+                isHighContrastYellow
+                  ? 'bg-neutral-900 border-amber-400 text-amber-300 hover:bg-neutral-800'
+                  : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-200'
+              }`}
+              title="Open User Medical Profile & Emergency Contacts"
+            >
+              {profile?.selfiePhotoUrl ? (
+                <img
+                  src={profile.selfiePhotoUrl}
+                  alt="Selfie"
+                  className="w-6 h-6 rounded-full object-cover border border-emerald-500"
+                />
+              ) : (
+                <div className="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs">
+                  {profile?.actualName?.charAt(0) || user.displayName?.charAt(0) || '👤'}
+                </div>
+              )}
+              <span className="max-w-[100px] truncate hidden sm:inline font-bold">
+                {profile?.actualName || user.displayName || (user.isAnonymous ? 'Guest' : 'My Profile')}
+              </span>
+              {profile?.bloodType && profile.bloodType !== 'Unknown' && (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-200">
+                  {profile.bloodType}
+                </span>
+              )}
+            </button>
+          ) : (
+            <button
+              id="btn-open-auth-modal"
+              onClick={onOpenAuth}
+              className={`accessible-tap px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 text-xs sm:text-sm border transition-all active:scale-98 shadow-2xs ${
+                isHighContrastYellow
+                  ? 'bg-amber-400 text-black border-amber-400'
+                  : 'bg-slate-900 text-white hover:bg-slate-800'
+              }`}
+              title="Sign In with Google or Phone"
+            >
+              <LogIn className="w-4 h-4" />
+              <span>Sign In</span>
+            </button>
+          )}
 
           {/* Emergency 995 SCDF Instant Trigger */}
           <button

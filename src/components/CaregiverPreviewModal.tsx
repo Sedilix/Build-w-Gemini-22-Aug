@@ -40,9 +40,9 @@ export const CaregiverPreviewModal: React.FC<CaregiverPreviewModalProps> = ({
 
   const isYellow = settings.contrastTheme === 'yellow-black';
 
-  const address = verification?.formattedAddress || 'Springfield Center';
-  const lat = verification?.verifiedCoordinates?.lat ?? 37.774929;
-  const lng = verification?.verifiedCoordinates?.lng ?? -122.419416;
+  const address = verification?.formattedAddress || '480 Lorong 6 Toa Payoh, Singapore 310480';
+  const lat = verification?.verifiedCoordinates?.lat ?? 1.3327;
+  const lng = verification?.verifiedCoordinates?.lng ?? 103.8479;
   const googleMapsUrl = verification?.shareUrls?.googleMapsUrl || `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
 
   useEffect(() => {

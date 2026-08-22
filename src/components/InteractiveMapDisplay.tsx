@@ -50,9 +50,9 @@ export const InteractiveMapDisplay: React.FC<InteractiveMapDisplayProps> = ({
 
   const isYellow = settings.contrastTheme === 'yellow-black';
 
-  const lat = verification?.verifiedCoordinates?.lat ?? gps?.latitude ?? 37.774929;
-  const lng = verification?.verifiedCoordinates?.lng ?? gps?.longitude ?? -122.419416;
-  const address = verification?.formattedAddress || 'Locating current spot...';
+  const lat = verification?.verifiedCoordinates?.lat ?? gps?.latitude ?? 1.3327;
+  const lng = verification?.verifiedCoordinates?.lng ?? gps?.longitude ?? 103.8479;
+  const address = verification?.formattedAddress || 'Locating current spot in Singapore...';
 
   const mapsApiKey = dynamicKey;
 

@@ -307,7 +307,12 @@ export const VoiceCommandOverlay: React.FC<VoiceCommandOverlayProps> = ({
 
       // Step 3: Speak aloud using Speechmatics TTS / Speech Synthesis for elder accessibility
       if (settings.spokenGuidance) {
-        await speakSpeechmaticsOrFallback(responseText, settings.speechmaticsVoice || 'sarah');
+        await speakSpeechmaticsOrFallback(
+          responseText, 
+          settings.speechmaticsVoice || 'sarah',
+          undefined,
+          settings.speechmaticsRate ?? 0.85
+        );
       }
 
       // Step 4: Execute structured physical action with reassuring delay

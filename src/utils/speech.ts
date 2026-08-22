@@ -6,18 +6,36 @@
 // Safe Text-to-Speech (TTS) engine optimized for elderly listeners
 let currentAudioElement: HTMLAudioElement | null = null;
 
+// Helper: Strip markdown formatting, emojis, URLs, and asterisks for smooth TTS audio
+export function cleanSpeakableText(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/https?:\/\/\S+/gi, '')
+    .replace(/[\*\_~`#>\[\]\(\)]/g, ' ')
+    .replace(/[\u{1F600}-\u{1F6FF}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1F018}-\u{1F270}\u{2388}-\u{27BF}]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export async function speakSpeechmaticsOrFallback(
   text: string, 
   voice: string = 'sarah', 
-  onEnd?: () => void
+  onEnd?: () => void,
+  rate: number = 0.9
 ): Promise<void> {
   stopSpeaking();
+
+  const sanitized = cleanSpeakableText(text);
+  if (!sanitized) {
+    if (onEnd) onEnd();
+    return;
+  }
 
   try {
     const res = await fetch('/api/speechmatics/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, voice }),
+      body: JSON.stringify({ text: sanitized, voice }),
     });
 
     if (res.ok) {
@@ -26,17 +44,27 @@ export async function speakSpeechmaticsOrFallback(
       const audio = new Audio(audioUrl);
       currentAudioElement = audio;
 
+      if (rate && rate > 0.5 && rate <= 2.0) {
+        try {
+          audio.playbackRate = rate;
+        } catch (e) {}
+      }
+
       audio.onended = () => {
         URL.revokeObjectURL(audioUrl);
-        currentAudioElement = null;
+        if (currentAudioElement === audio) {
+          currentAudioElement = null;
+        }
         if (onEnd) onEnd();
       };
 
       audio.onerror = () => {
         URL.revokeObjectURL(audioUrl);
-        currentAudioElement = null;
+        if (currentAudioElement === audio) {
+          currentAudioElement = null;
+        }
         // Fallback to Web Speech API
-        speakText(text, onEnd);
+        speakText(sanitized, onEnd);
       };
 
       await audio.play();
@@ -47,7 +75,7 @@ export async function speakSpeechmaticsOrFallback(
   }
 
   // Fallback to native Web Speech
-  speakText(text, onEnd);
+  speakText(sanitized, onEnd);
 }
 
 export function speakText(text: string, onEnd?: () => void): boolean {

@@ -61,9 +61,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
 
     setPlayingVoiceId(voice.id);
-    await speakSpeechmaticsOrFallback(voice.sampleText, voice.id, () => {
-      setPlayingVoiceId(null);
-    });
+    await speakSpeechmaticsOrFallback(
+      voice.sampleText, 
+      voice.id, 
+      () => {
+        setPlayingVoiceId(null);
+      },
+      settings.speechmaticsRate ?? 0.85
+    );
   };
 
   const handleSelectVoice = (voiceId: string) => {

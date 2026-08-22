@@ -32,18 +32,33 @@ import {
   SettingsModal 
 } from './components/SettingsModal';
 import { 
+  AuthModal 
+} from './components/AuthModal';
+import { 
+  ProfileModal 
+} from './components/ProfileModal';
+import { 
   GPSLocation, 
   LocationVerificationResult, 
   AccessibilitySettings, 
   EmergencyContact, 
-  LocationPreset 
+  LocationPreset,
+  UserProfile
 } from './types';
 import { DEFAULT_CONTACTS } from './data/defaultContacts';
 import { LOCATION_PRESETS } from './data/samplePresets';
 import { speakSpeechmaticsOrFallback, stopSpeaking } from './utils/speech';
+import { auth, subscribeToUserProfile, saveUserProfile } from './lib/firebase';
+import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { AlertCircle, PhoneCall, ShieldAlert, Sparkles, Check } from 'lucide-react';
 
 export default function App() {
+  // State: Firebase User & Firestore Profile
+  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+
   // State: Accessibility Settings
   const [settings, setSettings] = useState<AccessibilitySettings>(() => {
     try {
@@ -88,6 +103,28 @@ export default function App() {
 
   const initialVerificationDoneRef = useRef(false);
 
+  // Firebase Auth & Firestore Users Collection Sync
+  useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+      if (user) {
+        // Subscribe to Firestore Users/{uid}
+        const unsubscribeProfile = subscribeToUserProfile(user.uid, (profile) => {
+          setUserProfile(profile);
+          if (profile && profile.emergencyContacts && profile.emergencyContacts.length > 0) {
+            setContacts(profile.emergencyContacts);
+            localStorage.setItem('senior_safespot_contacts', JSON.stringify(profile.emergencyContacts));
+          }
+        });
+        return () => unsubscribeProfile();
+      } else {
+        setUserProfile(null);
+      }
+    });
+
+    return () => unsubscribeAuth();
+  }, []);
+
   // Apply theme classes to body
   useEffect(() => {
     document.body.className = '';
@@ -101,10 +138,21 @@ export default function App() {
     localStorage.setItem('senior_safespot_settings', JSON.stringify(settings));
   }, [settings]);
 
-  // Persist contacts
-  const handleSaveContacts = (updated: EmergencyContact[]) => {
+  // Persist contacts and sync to Firestore if user is authenticated
+  const handleSaveContacts = async (updated: EmergencyContact[]) => {
     setContacts(updated);
     localStorage.setItem('senior_safespot_contacts', JSON.stringify(updated));
+
+    if (currentUser) {
+      try {
+        await saveUserProfile({
+          uid: currentUser.uid,
+          emergencyContacts: updated,
+        });
+      } catch (e) {
+        console.warn('Could not sync contacts to Firestore Users collection:', e);
+      }
+    }
   };
 
   // Multimodal Gemini Verification Engine
@@ -138,7 +186,8 @@ export default function App() {
             speakSpeechmaticsOrFallback(
               data.elderlyVoiceSummary, 
               settings.speechmaticsVoice || 'sarah', 
-              () => setIsSpeaking(false)
+              () => setIsSpeaking(false),
+              settings.speechmaticsRate ?? 0.85
             );
           }
         }
@@ -148,7 +197,7 @@ export default function App() {
         setIsVerifyingAI(false);
       }
     },
-    [currentPhoto, settings.spokenGuidance, settings.speechmaticsVoice]
+    [currentPhoto, settings.spokenGuidance, settings.speechmaticsVoice, settings.speechmaticsRate]
   );
 
   // Acquire Live GPS
@@ -174,7 +223,7 @@ export default function App() {
         (err) => {
           console.warn('Geolocation failed or permission denied, using default preset:', err);
           setIsLoadingGPS(false);
-          // Default to the first sample preset (Springfield Center Walgreens) so app always works
+          // Default to the first sample preset (Toa Payoh Hub) so app always works
           const defaultPreset = LOCATION_PRESETS[0];
           const fallbackLoc: GPSLocation = {
             latitude: defaultPreset.lat,
@@ -221,8 +270,8 @@ export default function App() {
   const handlePhotoUpdate = (photoBase64: string, preset?: LocationPreset) => {
     setCurrentPhoto(photoBase64);
     const coords = gps || {
-      latitude: preset?.lat || 37.774929,
-      longitude: preset?.lng || -122.419416,
+      latitude: preset?.lat || 1.3327,
+      longitude: preset?.lng || 103.8479,
       accuracy: 10,
       heading: 0,
       speed: 0,
@@ -255,7 +304,8 @@ export default function App() {
     speakSpeechmaticsOrFallback(
       text, 
       settings.speechmaticsVoice || 'sarah', 
-      () => setIsSpeaking(false)
+      () => setIsSpeaking(false),
+      settings.speechmaticsRate ?? 0.85
     );
   };
 
@@ -306,6 +356,10 @@ export default function App() {
         onOpenVoiceCommand={() => setIsVoiceModalOpen(true)}
         onEmergencyTrigger={handleEmergencySOS}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
+        onOpenProfile={() => setIsProfileModalOpen(true)}
+        onOpenAuth={() => setIsAuthModalOpen(true)}
+        user={currentUser}
+        profile={userProfile}
         isSpeaking={isSpeaking}
         onStopSpeaking={stopSpeaking}
       />
@@ -432,10 +486,39 @@ export default function App() {
         settings={settings}
       />
 
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onAuthSuccess={(user) => {
+          setIsAuthModalOpen(false);
+          setIsProfileModalOpen(true);
+        }}
+        settings={settings}
+      />
+
+      <ProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        user={currentUser}
+        profile={userProfile}
+        onProfileUpdated={(updated) => {
+          setUserProfile(updated);
+          if (updated.emergencyContacts && updated.emergencyContacts.length > 0) {
+            setContacts(updated.emergencyContacts);
+          }
+        }}
+        contacts={contacts}
+        onOpenManageContacts={() => {
+          setIsProfileModalOpen(false);
+          setIsContactsModalOpen(true);
+        }}
+        settings={settings}
+      />
+
       {/* Footer Accessibility Notice */}
       <footer className="border-t border-slate-200/80 dark:border-neutral-800 py-6 px-4 text-center text-xs sm:text-sm font-medium text-slate-500 dark:text-inherit/70">
         <p>
-          Senior SafeSpot • Multimodal Location & Pickup Assistant • Powered by Gemini AI & Google Maps
+          Senior SafeSpot • Multimodal Location & Pickup Assistant • Powered by Gemini AI, Speechmatics & Firebase
         </p>
       </footer>
     </div>
