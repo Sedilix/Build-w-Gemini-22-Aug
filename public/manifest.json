@@ -1,0 +1,18 @@
+{
+  "name": "Senior SafeSpot Singapore",
+  "short_name": "SafeSpot SG",
+  "description": "Accessible elder pickup & emergency location assistant for Singapore with Google Maps landmark verification, 995 SCDF SOS, and one-tap caregiver alerts.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0f172a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='%23e11d48'/><circle cx='50' cy='50' r='36' fill='%23ffffff'/><circle cx='50' cy='50' r='18' fill='%23e11d48'/><text x='50' y='57' font-size='22' text-anchor='middle' fill='%23ffffff' font-family='sans-serif' font-weight='bold'>SG</text></svg>",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

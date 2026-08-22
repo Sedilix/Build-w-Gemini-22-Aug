@@ -1,0 +1,12 @@
+{
+  "name": "Senior SafeSpot - Visual Location & Pickup Assistant",
+  "description": "Accessible elder-friendly Singapore live location and pickup assistant with visual AI landmark cross-referencing against Google Street View, 995 SCDF emergency SOS, voice commands, and PWA support.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

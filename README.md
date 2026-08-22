@@ -1,11 +1,60 @@
-<div align="center">
+# Senior SafeSpot - Visual Location & Pickup Assistant
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+An elder-friendly Singapore live location and pickup assistant powered by **Gemini AI**, **Speechmatics Realtime Voice Engine (STT & TTS)**, and **Google Maps Platform** (Street View, Places, Roads, and Geocoding APIs).
 
-  <h1>Built with AI Studio</h2>
+---
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+## 🌟 Key Features
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+- **Gemini Multimodal Landmark Verification**: Cross-references user-taken photos and GPS coordinates with Google Street View and Google Places to identify distinctive visual landmarks (storefront signs, benches, shelters, building entrances).
+- **Speechmatics Realtime Voice Engine**:
+  - **Speech-to-Text (STT)**: Real-time microphone audio streaming via `@speechmatics/real-time-client` with live partial and final transcriptions.
+  - **Text-to-Speech (TTS)**: Choice of voices (**Sarah** [UK Friendly], **Jack** [US Support], **Megan** [US Companion], **Theo** [UK Presenter], and Neutral accents) with elder-friendly cadence (0.85x).
+- **Driver Pickup Notes & Directions**: Formats concise, actionable pickup notes for drivers and caregivers with direct navigation links to Google Maps, Apple Maps, and Waze.
+- **Singapore Emergency SOS (SCDF 995)**: Dedicated, accessible emergency dial trigger with a 5-second cancelable reassurance countdown.
+- **Elderly High-Contrast Visual Modes**: Includes Yellow-on-Black (maximum contrast), High B&W, and Warm Amber display modes with dynamic text size scaling.
 
-</div>
+---
+
+## 🚀 Getting Started
+
+### 1. Prerequisites
+- Node.js 18+
+- npm or yarn
+
+### 2. Installation
+```bash
+git clone https://github.com/Sedilix/Gemini-for-the-young-folks.git
+cd Gemini-for-the-young-folks
+npm install
+```
+
+### 3. Environment Configuration
+Create a `.env` file in the project root:
+```env
+# Gemini API Key for multimodal reasoning and location verification
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# Speechmatics API Key for realtime STT and TTS
+SPEECHMATICS_API_KEY=your_speechmatics_api_key_here
+
+# Optional: Google Maps Platform API Key (for Places, Roads, Street View & Geocoding)
+GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
+```
+
+### 4. Running the Development Server
+```bash
+npm run dev
+```
+The application will start at `http://localhost:3000`.
+
+### 5. Production Build
+```bash
+npm run build
+npm start
+```
+
+---
+
+## 🛡️ License
+Apache-2.0
