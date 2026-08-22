@@ -18,15 +18,19 @@ import {
   Compass, 
   ChevronRight,
   SunMedium,
-  CheckCircle2
+  CheckCircle2,
+  Radio
 } from 'lucide-react';
 import { 
   GPSLocation, 
   LocationVerificationResult, 
   AccessibilitySettings, 
-  LocationPreset 
+  LocationPreset,
+  BLEBeaconScan,
+  BLEScanState
 } from '../types';
 import { LOCATION_PRESETS } from '../data/samplePresets';
+import { subscribeToBLE, startBeaconScan, pairSafetyTag, getBLECapability } from '../utils/ble';
 
 interface HeroPickMeUpCameraProps {
   gps: GPSLocation | null;
@@ -53,6 +57,9 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [selectedPresetId, setSelectedPresetId] = useState<string>('toa-payoh-hub');
+  const [bleState, setBleState] = useState<BLEScanState>({ status: 'idle', beaconCount: 0 });
+  const [bleBeacons, setBleBeacons] = useState<BLEBeaconScan[]>([]);
+  const [bleUnsupportedReason, setBleUnsupportedReason] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -93,6 +100,34 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
       }
     };
   }, []);
+
+  // Mirror the live BLE scan into component state
+  useEffect(() => {
+    const unsubscribe = subscribeToBLE((state, beacons) => {
+      setBleState(state);
+      setBleBeacons(beacons);
+    });
+
+    getBLECapability().then((cap) => {
+      if (!cap.canScan && !cap.canPairDevice) {
+        setBleUnsupportedReason(cap.reason ?? null);
+      }
+    });
+
+    return unsubscribe;
+  }, []);
+
+  const handleEnableBeacons = async () => {
+    const state = await startBeaconScan();
+    // Browsers without the experimental scanning API can still follow one
+    // specific device the user picks from the chooser.
+    if (state.status === 'unavailable') {
+      const result = await pairSafetyTag();
+      if (!result.paired && result.error) {
+        setBleUnsupportedReason(result.error);
+      }
+    }
+  };
 
   const handleSnapAndPickMeUp = () => {
     let photoData: string | undefined = undefined;
@@ -312,7 +347,7 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
               </p>
             )}
 
-            {/* BLE Micro-Location Beacon Triangulation */}
+            {/* BLE Micro-Location Beacon (only what the radio actually heard) */}
             {verification.bleBeacons && verification.bleBeacons.length > 0 && (
               <div className="pt-2 border-t border-slate-200/60 dark:border-neutral-700/60 flex flex-wrap items-center justify-between gap-2 text-xs">
                 <div className="flex items-center gap-1.5 font-bold text-sky-700 dark:text-sky-300">
@@ -321,16 +356,78 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="px-2 py-0.5 rounded-md font-mono font-bold bg-sky-100 dark:bg-sky-950 text-sky-800 dark:text-sky-200 border border-sky-300 dark:border-sky-800 text-[10px]">
-                    RSSI {verification.bleBeacons[0].rssi} dBm (±{verification.bleBeacons[0].estimatedDistanceMeters}m)
+                    RSSI {verification.bleBeacons[0].rssi} dBm (≈{verification.bleBeacons[0].estimatedDistanceMeters}m)
                   </span>
-                  <span className="text-[10px] uppercase font-black text-emerald-600 dark:text-emerald-400">
-                    ⚡ Sub-3m Precision
-                  </span>
+                  {verification.bleAccuracyBoost && (
+                    <span className="text-[10px] uppercase font-black text-emerald-600 dark:text-emerald-400">
+                      ⚡ Beacon-refined pin
+                    </span>
+                  )}
                 </div>
               </div>
             )}
           </div>
         )}
+
+        {/* BLE Beacon Scanner Status — reflects the real radio, never a simulation */}
+        <div className={`rounded-2xl border-2 p-3.5 space-y-2 ${
+          isYellow
+            ? 'bg-neutral-900 border-amber-400 text-amber-300'
+            : 'bg-sky-50/60 border-sky-200 text-slate-800'
+        }`}>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 font-bold text-xs sm:text-sm">
+              <Radio className={`w-4 h-4 ${bleState.status === 'scanning' ? 'text-sky-600 animate-pulse' : 'text-slate-400'}`} />
+              <span>Bluetooth Beacon Micro-Location</span>
+            </div>
+
+            {bleState.status === 'scanning' ? (
+              <span className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                Listening • {bleState.beaconCount} in range
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={handleEnableBeacons}
+                disabled={bleState.status === 'requesting'}
+                className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-all disabled:opacity-50 ${
+                  isYellow
+                    ? 'bg-amber-400 text-black border-amber-400'
+                    : 'bg-slate-900 text-white border-slate-900 hover:bg-slate-800'
+                }`}
+              >
+                {bleState.status === 'requesting' ? 'Starting...' : 'Turn On Beacon Scan'}
+              </button>
+            )}
+          </div>
+
+          {/* Beacons the radio is actually hearing right now */}
+          {bleBeacons.length > 0 ? (
+            <div className="space-y-1">
+              {bleBeacons.slice(0, 3).map((b) => (
+                <div key={b.id} className="flex items-center justify-between gap-2 text-[11px]">
+                  <span className="truncate font-semibold flex items-center gap-1.5">
+                    {b.isPairedTag ? '🏷️' : b.isKnownVenue ? '📍' : '📶'}
+                    <span className="truncate">{b.locationName}</span>
+                    {!b.isKnownVenue && !b.isPairedTag && (
+                      <span className="shrink-0 opacity-60 font-normal">(unregistered)</span>
+                    )}
+                  </span>
+                  <span className="shrink-0 font-mono opacity-80">
+                    {b.rssi} dBm ≈ {b.estimatedDistanceMeters}m
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[11px] opacity-75 leading-snug">
+              {bleState.status === 'scanning'
+                ? "No beacons in range yet. Registered venue beacons and the senior's paired tag will appear here as they are detected."
+                : bleState.error || bleUnsupportedReason || "Turn on scanning to detect nearby venue beacons and the senior's safety tag for sub-metre pickup accuracy."}
+            </p>
+          )}
+        </div>
 
         {/* Presets Quick Picker (For Testing / Fallback) */}
         <div className="pt-1 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 dark:text-inherit/70">

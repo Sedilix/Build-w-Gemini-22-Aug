@@ -614,9 +614,17 @@ app.post('/api/gemini/analyze-location', async (req, res) => {
       ? `Roads API Snap-to-Road: Raw GPS was snapped to nearest drivable roadway at lat ${snappedRoad.lat}, lng ${snappedRoad.lng} (Place ID: ${snappedRoad.placeId || 'N/A'})`
       : 'Roads API: Using raw GPS centroid.';
 
-    const bleContext = (bleBeacons && bleBeacons.length > 0)
-      ? `BLE Micro-Location Beacons in Range: ${bleBeacons.map((b: any) => `${b.name} (${b.locationName}, RSSI: ${b.rssi} dBm, ~${b.estimatedDistanceMeters}m away, floor: ${b.floorLevel || 'Ground'})`).join('; ')}`
-      : 'No BLE beacon detected in immediate range.';
+    // Only beacons at surveyed positions can refine the pin. A detected but
+    // unregistered device is real radio traffic that says nothing about where
+    // the senior is standing, so it must not be offered as location evidence.
+    const venueBeacons = (bleBeacons || []).filter((b: any) => b.isKnownVenue);
+    const pairedTag = (bleBeacons || []).find((b: any) => b.isPairedTag);
+
+    const bleContext = venueBeacons.length > 0
+      ? `BLE Micro-Location Beacons in Range (measured over the air, surveyed positions): ${venueBeacons
+          .map((b: any) => `${b.name} at ${b.locationName} (RSSI ${b.rssi} dBm, estimated ${b.estimatedDistanceMeters}m away${b.floorLevel ? `, floor: ${b.floorLevel}` : ''})`)
+          .join('; ')}. Distances are estimated from radio signal strength and degrade badly through walls and crowds, so treat them as supporting evidence for the photo and Places data, not as ground truth that overrides them.`
+      : `No registered venue BLE beacon detected in range${pairedTag ? `, though the senior's own paired safety tag is nearby (RSSI ${pairedTag.rssi} dBm)` : ''}. Rely on GPS, the photo, and Places API only — do not infer a beacon-based position.`;
 
     const promptText = `
 You are an expert AI Location Specialist and Elder Pickup Assistant for Singapore and worldwide locations.
@@ -634,10 +642,10 @@ Google Maps Platform Multi-API & BLE Grounding:
 TASK:
 1. Analyze the user's uploaded surroundings photo (if provided) along with the Roads API snapped curbside, Places API verified landmark list, and detected BLE Beacon micro-location signatures.
 2. Cross-reference visible features (storefront signs, awning colors, building numbers, door entrances, benches, pavement markers, transit stops, distinct street signs) against what Google Street View, Places API, and BLE beacons show at these coordinates.
-3. If high-strength BLE beacons are detected (RSSI > -70 dBm), leverage their exact micro-location position and floor level to refine accuracy down to sub-3-meter precision.
+3. If a REGISTERED venue BLE beacon is listed above with a strong signal (RSSI above -70 dBm), use its surveyed position and floor level to refine the pickup point. Only beacons listed above count; never assume a beacon is present when none is listed.
 4. Assess whether the senior is currently INDOORS (inside a mall/building/MRT), OUTDOORS at roadside, under an HDB VOID DECK, or under a SHELTERED PORCH based on ceilings, artificial lighting, floor tiles, columns, BLE beacons, and GPS attenuation.
 5. If indoors, identify the indoor context (e.g. "Inside Toa Payoh Hub Level 1 near FairPrice") and provide clear step-by-step guidance for the elder to reach the nearest vehicle pickup point or taxi bay.
-6. Determine refined/verified coordinates (prioritize BLE beacon coordinates if within immediate range, or Roads API snapped curbside if the user is by the road).
+6. Determine refined/verified coordinates (prefer a registered beacon's surveyed position when one is within a few metres, otherwise the Roads API snapped curbside if the user is by the road).
 7. Extract 2-4 concrete, easily identifiable visual landmarks with high distinction (utilize real names from Places/BLE API results when matching).
 8. Create crystal-clear pickup instructions for the driver (e.g. "Pull up directly in front of the taxi stand or main entrance. Elder is waiting under the sheltered walkway.").
 9. Create a warm, calming, simple voice summary for the elderly user (written in short, easy-to-hear sentences without technical jargon, mentioning if they need to step out to the pickup bay).
@@ -812,7 +820,8 @@ Output your answer strictly using the provided JSON schema.`;
       indoorContext: parsed.indoorContext || (parsed.isIndoors ? 'Inside building/concourse' : 'Outdoor street area'),
       indoorExitGuidance: parsed.indoorExitGuidance || (parsed.isIndoors ? 'Please step towards the nearest ground floor entrance or taxi stand.' : 'Wait safely at the curbside.'),
       bleBeacons: bleBeacons || [],
-      bleAccuracyBoost: Boolean(bleBeacons && bleBeacons.some((b: any) => b.rssi >= -70)),
+      // Only a surveyed beacon close enough to trust actually improves the pin.
+      bleAccuracyBoost: venueBeacons.some((b: any) => b.rssi >= -70 && b.estimatedDistanceMeters <= 3),
       pickupInstructionsForDriver: parsed.pickupInstructionsForDriver || 'Please pull up to the exact pin location.',
       elderlyVoiceSummary: parsed.elderlyVoiceSummary || `You are at ${formattedAddress}. Your location is verified.`,
       safeWaitingAdvice: parsed.safeWaitingAdvice || 'Stay where you are in a visible and comfortable spot.',

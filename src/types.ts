@@ -79,21 +79,45 @@ export interface LocationVerificationResult {
   photoUrl?: string;
 }
 
+/** A beacon actually heard on the radio during a Web Bluetooth scan. */
 export interface BLEBeaconScan {
   id: string;
   name: string;
   uuid?: string;
   major?: number;
   minor?: number;
-  rssi: number; // dBm e.g. -62 dBm
+  rssi: number; // Measured signal strength in dBm, e.g. -62
+  txPower?: number; // Calibrated RSSI at 1m, from the advertisement when broadcast
   proximity: 'immediate' | 'near' | 'far' | 'unknown'; // <1m, 1-3m, >3m
   estimatedDistanceMeters: number;
   locationName: string; // e.g. "Toa Payoh Hub Taxi Stand 1 - Beacon #04"
   floorLevel?: string; // e.g. "Level 1" or "Basement 1 Concourse"
-  zoneType: 'transit_hub' | 'hospital' | 'hdb_estate' | 'shopping_mall' | 'caregiver_tag';
+  zoneType: 'transit_hub' | 'hospital' | 'hdb_estate' | 'shopping_mall' | 'caregiver_tag' | 'unknown';
   lat?: number;
   lng?: number;
   batteryPercent?: number;
+  /** Advertisement format this was decoded from. */
+  format: 'ibeacon' | 'eddystone' | 'generic';
+  /** True only when the beacon's id matches a surveyed venue in the registry. */
+  isKnownVenue: boolean;
+  /** True when this is the senior's own paired safety pendant. */
+  isPairedTag: boolean;
+  /** Epoch ms of the last advertisement received from this beacon. */
+  lastSeen: number;
+}
+
+/** What this browser and device are able to do with Bluetooth. */
+export interface BLECapability {
+  supported: boolean;
+  canScan: boolean; // Passive advertisement scanning (requestLEScan)
+  canPairDevice: boolean; // Device chooser (requestDevice)
+  reason?: string; // Plain-language explanation when something is unavailable
+}
+
+export interface BLEScanState {
+  status: 'idle' | 'requesting' | 'scanning' | 'denied' | 'unavailable';
+  beaconCount: number;
+  error?: string;
 }
 
 export interface EmergencyContact {
@@ -209,6 +233,7 @@ export interface AccessibilitySettings {
   speechmaticsRate?: number; // 0.85 (elder-friendly) to 1.0
   language: Language; // UI + voice readout language (default 'en')
   fallDetection?: boolean; // Passive accelerometer fall monitoring
+  crashDetection?: boolean; // High-G vehicle crash impact detection (iOS / Android)
 }
 
 export interface LocationPreset {
@@ -225,8 +250,7 @@ export interface LocationPreset {
 
 /**
  * Live incident document stored at Firestore `Incidents/{incidentId}`.
- * Created when the elder alerts family, so caregivers can open
- * `/track/:incidentId` and follow the senior's live GPS without an app.
+ * Created when the elder alerts family or when a crash/fall is detected.
  */
 export interface Incident {
   incidentId: string;
@@ -235,6 +259,12 @@ export interface Incident {
   elderSelfieUrl?: string;
   bloodType?: string;
   medicalNotes?: string;
+  incidentType?: 'manual_sos' | 'fall' | 'crash';
+  crashMetrics?: {
+    impactGForce: number; // in Gs (e.g. 3.8G)
+    preImpactSpeedKmh: number; // e.g. 52 km/h
+    peakRotationRateDps?: number; // degrees/sec
+  };
   currentGps: {
     lat: number;
     lng: number;

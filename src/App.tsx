@@ -57,8 +57,15 @@ import { DEFAULT_CONTACTS } from './data/defaultContacts';
 import { LOCATION_PRESETS } from './data/samplePresets';
 import { speakSpeechmaticsOrFallback, stopSpeaking } from './utils/speech';
 import { getBatteryStatus, watchBattery } from './utils/telemetry';
-import { ensureMotionPermission, startFallDetection, FallDetectionHandle } from './utils/fallDetection';
-import { scanNearbyBLEBeacons } from './utils/ble';
+import { 
+  ensureMotionPermission, 
+  startCrashAndFallDetection, 
+  playEmergencyAlarmSiren, 
+  stopEmergencyAlarmSiren, 
+  updateMotionGpsSpeed, 
+  CrashEventData 
+} from './utils/fallDetection';
+import { getBeaconsForVerification, startBeaconScan, stopBeaconScan } from './utils/ble';
 import { auth, subscribeToUserProfile, saveUserProfile, createIncident, updateIncident } from './lib/firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { AlertCircle, PhoneCall, ShieldAlert, Sparkles, Check } from 'lucide-react';
@@ -145,6 +152,7 @@ function SeniorSafeSpotHome() {
   );
   const [isAlertingFamily, setIsAlertingFamily] = useState(false);
   const [fallCountdown, setFallCountdown] = useState<number | null>(null);
+  const [activeImpactEvent, setActiveImpactEvent] = useState<CrashEventData | null>(null);
   // True only while a hero "Pick Me Up Here!" capture is being processed, so
   // the background boot verification never disables the giant button.
   const [heroBusy, setHeroBusy] = useState(false);
@@ -230,8 +238,9 @@ function SeniorSafeSpotHome() {
     ) => {
       setIsVerifyingAI(true);
       try {
-        // Scan nearby BLE beacons in parallel with photo & GPS
-        const bleBeacons = await scanNearbyBLEBeacons(coords.latitude, coords.longitude);
+        // Snapshot whatever the live BLE scan has actually heard. Empty unless
+        // the senior started scanning and a registered beacon is in range.
+        const bleBeacons = getBeaconsForVerification();
 
         const res = await fetch('/api/gemini/analyze-location', {
           method: 'POST',
@@ -277,6 +286,7 @@ function SeniorSafeSpotHome() {
     if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
+          updateMotionGpsSpeed(pos.coords.speed);
           const loc: GPSLocation = {
             latitude: pos.coords.latitude,
             longitude: pos.coords.longitude,
@@ -295,46 +305,26 @@ function SeniorSafeSpotHome() {
           setIsLoadingGPS(false);
           // Default to the first sample preset (Toa Payoh Hub) so app always works
           const defaultPreset = LOCATION_PRESETS[0];
-          const fallbackLoc: GPSLocation = {
-            latitude: defaultPreset.lat,
-            longitude: defaultPreset.lng,
-            accuracy: defaultPreset.accuracy,
-            heading: 0,
-            speed: 0,
-            altitude: 10,
-            timestamp: Date.now(),
-          };
-          setGps(fallbackLoc);
-          setCurrentPhoto(defaultPreset.sampleImageUrl);
-          triggerLocationVerification(fallbackLoc, defaultPreset.sampleImageUrl, '', defaultPreset);
+          handleSelectPreset(defaultPreset);
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
       );
     } else {
       setIsLoadingGPS(false);
       const defaultPreset = LOCATION_PRESETS[0];
-      const fallbackLoc: GPSLocation = {
-        latitude: defaultPreset.lat,
-        longitude: defaultPreset.lng,
-        accuracy: defaultPreset.accuracy,
-        heading: 0,
-        speed: 0,
-        altitude: 10,
-        timestamp: Date.now(),
-      };
-      setGps(fallbackLoc);
-      setCurrentPhoto(defaultPreset.sampleImageUrl);
-      triggerLocationVerification(fallbackLoc, defaultPreset.sampleImageUrl, '', defaultPreset);
+      handleSelectPreset(defaultPreset);
     }
   }, [currentPhoto, triggerLocationVerification]);
 
-  // Initial boot
+  // Initial GPS acquisition & verification on mount
   useEffect(() => {
-    if (!initialVerificationDoneRef.current) {
-      initialVerificationDoneRef.current = true;
-      refreshGPS();
-    }
+    if (initialVerificationDoneRef.current) return;
+    initialVerificationDoneRef.current = true;
+    refreshGPS();
   }, [refreshGPS]);
+
+  // Release the Bluetooth radio when the app unmounts
+  useEffect(() => stopBeaconScan, []);
 
   /**
    * Hero "Pick Me Up Here!" one-tap flow: snap surroundings photo, grab fresh
@@ -342,39 +332,53 @@ function SeniorSafeSpotHome() {
    * then auto-scroll the elder down to the verified location card.
    */
   const handlePickMeUp = useCallback(
-    (photoBase64: string | null) => {
-      const photo = photoBase64 || currentPhoto || LOCATION_PRESETS[0].sampleImageUrl;
-      if (photoBase64) setCurrentPhoto(photoBase64);
-
-      // Bring the verification card into view so the elder sees progress
-      document
-        .getElementById('card-live-location')
-        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
+    async (snappedPhotoBase64?: string, preset?: LocationPreset) => {
       setHeroBusy(true);
-      setIsLoadingGPS(true);
 
-      const runVerification = (loc: GPSLocation) => {
-        setGps(loc);
-        setIsLoadingGPS(false);
-        triggerLocationVerification(loc, photo);
+      // This tap is a user gesture, which is the only context a browser will
+      // start a Bluetooth scan from. Fire and forget: beacons take a moment to
+      // arrive, so this tap warms the scan for subsequent verifications rather
+      // than blocking this one.
+      void startBeaconScan();
+
+      const runVerification = (coords: GPSLocation) => {
+        const photoToUse = snappedPhotoBase64 || currentPhoto;
+        if (snappedPhotoBase64) {
+          setCurrentPhoto(snappedPhotoBase64);
+        }
+        triggerLocationVerification(coords, photoToUse, '', preset);
       };
 
-      const fallbackLoc: GPSLocation =
-        gps || {
-          latitude: LOCATION_PRESETS[0].lat,
-          longitude: LOCATION_PRESETS[0].lng,
-          accuracy: LOCATION_PRESETS[0].accuracy,
+      if (preset) {
+        const presetLoc: GPSLocation = {
+          latitude: preset.lat,
+          longitude: preset.lng,
+          accuracy: preset.accuracy,
           heading: 0,
           speed: 0,
-          altitude: 10,
+          altitude: 0,
           timestamp: Date.now(),
         };
+        setGps(presetLoc);
+        runVerification(presetLoc);
+        return;
+      }
+
+      const fallbackLoc: GPSLocation = gps || {
+        latitude: LOCATION_PRESETS[0].lat,
+        longitude: LOCATION_PRESETS[0].lng,
+        accuracy: LOCATION_PRESETS[0].accuracy,
+        heading: 0,
+        speed: 0,
+        altitude: 0,
+        timestamp: Date.now(),
+      };
 
       if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
         navigator.geolocation.getCurrentPosition(
           (pos) => {
-            runVerification({
+            updateMotionGpsSpeed(pos.coords.speed);
+            const freshLoc: GPSLocation = {
               latitude: pos.coords.latitude,
               longitude: pos.coords.longitude,
               accuracy: pos.coords.accuracy || 15,
@@ -382,7 +386,9 @@ function SeniorSafeSpotHome() {
               speed: pos.coords.speed,
               altitude: pos.coords.altitude,
               timestamp: pos.timestamp,
-            });
+            };
+            setGps(freshLoc);
+            runVerification(freshLoc);
           },
           (err) => {
             console.warn('Hero GPS acquisition failed, using last known location:', err);
@@ -438,7 +444,10 @@ function SeniorSafeSpotHome() {
    * medical profile, current GPS, and live battery. Returns the incident ID
    * so callers can build the `/track/:id` caregiver link.
    */
-  const createLiveIncident = useCallback(async (): Promise<string | null> => {
+  const createLiveIncident = useCallback(async (
+    incidentType: 'manual_sos' | 'fall' | 'crash' = 'manual_sos',
+    crashMetrics?: { impactGForce: number; preImpactSpeedKmh: number; peakRotationRateDps?: number }
+  ): Promise<string | null> => {
     try {
       const batt = battery.supported ? battery : await getBatteryStatus();
       const now = Date.now();
@@ -448,6 +457,8 @@ function SeniorSafeSpotHome() {
         elderSelfieUrl: userProfile?.selfiePhotoUrl,
         bloodType: userProfile?.bloodType,
         medicalNotes: userProfile?.medicalNotes || '',
+        incidentType,
+        crashMetrics,
         currentGps: gps
           ? { lat: gps.latitude, lng: gps.longitude, accuracy: gps.accuracy, timestamp: gps.timestamp }
           : null,
@@ -533,35 +544,48 @@ function SeniorSafeSpotHome() {
     };
   }, [activeIncidentId]);
 
-  // Passive fall monitoring via accelerometer (opt-in via settings)
+  // Passive high-G crash & fall monitoring via accelerometer (opt-in via settings)
   useEffect(() => {
-    if (!settings.fallDetection) return;
-    let handle: FallDetectionHandle | null = null;
+    if (settings.fallDetection === false && settings.crashDetection === false) return;
+    let handle: { stop: () => void } | null = null;
     let cancelled = false;
 
     ensureMotionPermission().then((granted) => {
       if (cancelled || !granted) return;
-      handle = startFallDetection(() => setFallCountdown(10));
+      handle = startCrashAndFallDetection((event) => {
+        if (event.type === 'crash' && settings.crashDetection === false) return;
+        if (event.type === 'fall' && settings.fallDetection === false) return;
+
+        setActiveImpactEvent(event);
+        setFallCountdown(10);
+        playEmergencyAlarmSiren();
+
+        if (settings.spokenGuidance) {
+          const alertText = event.type === 'crash'
+            ? 'Severe vehicle crash detected! Notifying SCDF emergency 995 in 10 seconds. Tap I am okay to cancel.'
+            : `${t('fall.title', lang)}. ${t('fall.desc', lang)}`;
+          speakSpeechmaticsOrFallback(
+            alertText,
+            settings.speechmaticsVoice || 'sarah',
+            undefined,
+            0.95,
+            lang
+          );
+        }
+      });
     });
 
     return () => {
       cancelled = true;
       handle?.stop();
     };
-  }, [settings.fallDetection]);
+  }, [settings.fallDetection, settings.crashDetection, settings.spokenGuidance, settings.speechmaticsVoice, lang]);
 
-  // Fall countdown: reassuring audio + big cancel button, auto-dials 995 at 0
+  // Fall/Crash countdown: reassuring audio + siren + cancel button, auto-dials 995 at 0
   useEffect(() => {
-    if (fallCountdown === null) return;
-
-    if (fallCountdown === 10 && settings.spokenGuidance) {
-      speakSpeechmaticsOrFallback(
-        `${t('fall.title', lang)}. ${t('fall.desc', lang)}`,
-        settings.speechmaticsVoice || 'sarah',
-        undefined,
-        0.95,
-        lang
-      );
+    if (fallCountdown === null) {
+      stopEmergencyAlarmSiren();
+      return;
     }
 
     if (fallCountdown > 0) {
@@ -569,10 +593,46 @@ function SeniorSafeSpotHome() {
       return () => clearTimeout(timer);
     } else {
       setFallCountdown(null);
-      void createLiveIncident();
+      stopEmergencyAlarmSiren();
+      const currentEv = activeImpactEvent;
+      void createLiveIncident(
+        currentEv?.type || 'fall',
+        currentEv ? {
+          impactGForce: currentEv.impactGForce,
+          preImpactSpeedKmh: currentEv.speedKmh,
+          peakRotationRateDps: currentEv.rotationRateDps,
+        } : undefined
+      );
       window.location.href = 'tel:995';
     }
-  }, [fallCountdown, settings.spokenGuidance, settings.speechmaticsVoice, lang, createLiveIncident]);
+  }, [fallCountdown, activeImpactEvent, createLiveIncident]);
+
+  // Test Simulator Handler for Crash & Fall Emergency Drills
+  const handleSimulateImpact = (type: 'crash' | 'fall') => {
+    const mockEvent: CrashEventData = {
+      type,
+      impactGForce: type === 'crash' ? 4.2 : 2.4,
+      speedKmh: type === 'crash' ? 52 : 0,
+      rotationRateDps: type === 'crash' ? 340 : 45,
+      timestamp: Date.now(),
+    };
+    setActiveImpactEvent(mockEvent);
+    setFallCountdown(10);
+    playEmergencyAlarmSiren();
+
+    if (settings.spokenGuidance) {
+      const alertText = type === 'crash'
+        ? 'Severe vehicle crash detected! Notifying SCDF emergency 995 in 10 seconds. Tap I am okay to cancel.'
+        : `${t('fall.title', lang)}. ${t('fall.desc', lang)}`;
+      speakSpeechmaticsOrFallback(
+        alertText,
+        settings.speechmaticsVoice || 'sarah',
+        undefined,
+        0.95,
+        lang
+      );
+    }
+  };
 
   // Emergency SOS Trigger with 5-second cancelable countdown
   const handleEmergencySOS = () => {
@@ -592,9 +652,7 @@ function SeniorSafeSpotHome() {
       const address = verification?.formattedAddress || 'My Current Location';
       const batteryText = battery.level !== null ? ` Battery: ${battery.level}%${battery.charging ? ' (charging)' : ''}.` : '';
       console.info(`SOS SCDF dispatch — address: ${address}.${batteryText}`);
-      // Create the live incident so family/SCDF can track via /track/:id,
-      // then immediately dial Singapore 995.
-      void createLiveIncident();
+      void createLiveIncident('manual_sos');
       window.location.href = `tel:995`;
     }
   }, [emergencyCountdown, verification, battery, createLiveIncident]);
@@ -648,30 +706,47 @@ function SeniorSafeSpotHome() {
         </div>
       )}
 
-      {/* Fall Detection Cancelable Countdown Overlay */}
+      {/* Fall / Crash Detection Cancelable Countdown Overlay */}
       {fallCountdown !== null && (
         <div
           id="overlay-fall-detection-countdown"
-          className="bg-brick/95 fixed inset-0 z-[60] flex flex-col items-center justify-center gap-6 p-6 text-center"
+          className="bg-brick/95 backdrop-blur-md fixed inset-0 z-[60] flex flex-col items-center justify-center gap-6 p-6 text-center animate-fadeIn"
         >
-          <ShieldAlert className="text-on-brick h-16 w-16" />
-          <div>
-            <h2 className="font-display text-on-brick text-3xl font-bold sm:text-4xl">
-              {t('fall.title', lang)}
-            </h2>
-            <p className="text-on-brick/90 mt-2 text-lg font-semibold sm:text-xl">
-              {t('fall.desc', lang)} ({fallCountdown}s)
-            </p>
+          <div className="relative">
+            <div className="absolute -inset-4 bg-white/20 rounded-full animate-ping"></div>
+            <ShieldAlert className="text-on-brick h-20 w-20 relative" />
           </div>
+
+          <div className="space-y-2 max-w-lg">
+            <h2 className="font-display text-on-brick text-3xl sm:text-5xl font-black uppercase tracking-tight">
+              {activeImpactEvent?.type === 'crash' ? '🚗 VEHICLE CRASH DETECTED' : t('fall.title', lang)}
+            </h2>
+            <p className="text-on-brick/90 text-lg sm:text-2xl font-bold">
+              {activeImpactEvent?.type === 'crash'
+                ? `Calling SCDF 995 & Alerting Family in ${fallCountdown}s`
+                : `${t('fall.desc', lang)} (${fallCountdown}s)`}
+            </p>
+
+            {activeImpactEvent && (
+              <div className="inline-flex items-center gap-3 bg-black/30 text-on-brick text-sm sm:text-base font-mono px-4 py-2 rounded-full border border-white/20">
+                <span>Impact Shock: <strong>{activeImpactEvent.impactGForce}G</strong></span>
+                {activeImpactEvent.speedKmh > 0 && (
+                  <span>• Pre-Impact Speed: <strong>{activeImpactEvent.speedKmh} km/h</strong></span>
+                )}
+              </div>
+            )}
+          </div>
+
           <button
             id="btn-fall-im-okay"
             onClick={() => {
               setFallCountdown(null);
+              stopEmergencyAlarmSiren();
               stopSpeaking();
             }}
-            className="bg-on-brick text-brick-deep font-display rounded-3xl px-12 py-8 text-3xl font-bold shadow-2xl active:scale-95 sm:text-4xl"
+            className="giant-tap bg-white text-brick-deep font-black rounded-3xl px-10 py-6 sm:px-14 sm:py-8 text-2xl sm:text-4xl shadow-2xl border-4 border-white active:scale-95 transition-transform"
           >
-            {t('fall.imOkay', lang)}
+            ✋ {t('fall.imOkay', lang)}
           </button>
         </div>
       )}
@@ -765,6 +840,7 @@ function SeniorSafeSpotHome() {
         settings={settings}
         onUpdateSettings={setSettings}
         onOpenManageContacts={() => setIsContactsModalOpen(true)}
+        onSimulateImpact={handleSimulateImpact}
       />
 
       <CaregiverPreviewModal

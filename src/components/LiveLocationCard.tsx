@@ -168,6 +168,12 @@ export const LiveLocationCard: React.FC<LiveLocationCardProps> = ({
             <span className="bg-ochre h-2 w-2 rounded-full"></span>
             Routes API: Live Driver Navigation
           </span>
+          {verification?.bleBeacons && verification.bleBeacons.length > 0 && (
+            <span className="chip border-sky-400 bg-sky-50 text-sky-900 font-bold">
+              <span className="bg-sky-600 h-2 w-2 rounded-full animate-ping"></span>
+              BLE: {verification.bleBeacons[0].name} (±{verification.bleBeacons[0].estimatedDistanceMeters}m)
+            </span>
+          )}
         </div>
       </div>
     </section>
