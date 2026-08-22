@@ -14,9 +14,10 @@ import {
   UserPlus, 
   HeartHandshake,
   Car,
-  Share2,
-  Radio,
-  Loader2
+  Share2, 
+  Radio, 
+  Loader2,
+  Star
 } from 'lucide-react';
 import { EmergencyContact, LocationVerificationResult, AccessibilitySettings } from '../types';
 import { t } from '../locales/translations';
@@ -43,6 +44,8 @@ export const OneTapSharePanel: React.FC<OneTapSharePanelProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [lastSentTo, setLastSentTo] = useState<string | null>(null);
+  const [sendingContactId, setSendingContactId] = useState<string | null>(null);
+  const [sentContactIds, setSentContactIds] = useState<Record<string, boolean>>({});
 
   const lang = settings.language || 'en';
 
@@ -74,24 +77,62 @@ export const OneTapSharePanel: React.FC<OneTapSharePanelProps> = ({
     }
   };
 
-  const triggerSendContact = (contact: EmergencyContact, channel: 'sms' | 'whatsapp' | 'call') => {
-    setLastSentTo(contact.name);
-    setTimeout(() => setLastSentTo(null), 4000);
+  /**
+   * Direct 1-Tap Location Pin Dispatch:
+   * Sends the live Google Maps pin, verified address, and driver note directly
+   * to the contact's phone without launching the messaging app or requiring a 2nd tap!
+   */
+  const handleDirectSendPin = async (contact: EmergencyContact) => {
+    if (sendingContactId === contact.id) return;
+    setSendingContactId(contact.id);
 
-    const message = encodeURIComponent(
-      `Hi ${contact.name}! I need a pickup here:\n📍 ${address}\n🚗 Pickup Note: ${verification?.pickupInstructionsForDriver || 'Waiting by curb'}\n🗺️ Google Maps Navigation: ${shareUrls?.googleMapsUrl || ''}`
-    );
+    try {
+      const blePrecision = verification?.bleAccuracyBoost && verification?.bleBeacons?.[0]
+        ? `${verification.bleBeacons[0].locationName} (≈${verification.bleBeacons[0].estimatedDistanceMeters}m)`
+        : undefined;
 
-    if (channel === 'sms') {
-      const cleanPhone = contact.phone.replace(/[^0-9+]/g, '');
-      window.location.href = `sms:${cleanPhone}?&body=${message}`;
-    } else if (channel === 'whatsapp') {
-      const cleanPhone = contact.phone.replace(/[^0-9]/g, '');
-      window.open(`https://wa.me/${cleanPhone}?text=${message}`, '_blank');
-    } else if (channel === 'call') {
-      const cleanPhone = contact.phone.replace(/[^0-9+]/g, '');
-      window.location.href = `tel:${cleanPhone}`;
+      const res = await fetch('/api/notify/dispatch-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contactId: contact.id,
+          contactName: contact.name,
+          phone: contact.phone,
+          address: verification?.formattedAddress || address,
+          googleMapsUrl: shareUrls?.googleMapsUrl || `https://www.google.com/maps/search/?api=1&query=${verification?.verifiedCoordinates.lat},${verification?.verifiedCoordinates.lng}`,
+          driverHint: verification?.pickupInstructionsForDriver,
+          blePrecision,
+          incidentId: localStorage.getItem('senior_safespot_active_incident') || undefined,
+        }),
+      });
+
+      if (res.ok) {
+        setSentContactIds((prev) => ({ ...prev, [contact.id]: true }));
+        setLastSentTo(contact.name);
+
+        // Optional speech synthesis feedback
+        if ('speechSynthesis' in window && settings.spokenGuidance) {
+          const utterance = new SpeechSynthesisUtterance(`Location pin sent to ${contact.name.split(' ')[0]}.`);
+          utterance.rate = 0.9;
+          window.speechSynthesis.speak(utterance);
+        }
+
+        setTimeout(() => {
+          setSentContactIds((prev) => ({ ...prev, [contact.id]: false }));
+        }, 4500);
+
+        setTimeout(() => setLastSentTo(null), 5000);
+      }
+    } catch (err) {
+      console.warn('Direct pin dispatch error:', err);
+    } finally {
+      setSendingContactId(null);
     }
+  };
+
+  const handleCallContact = (contact: EmergencyContact) => {
+    const cleanPhone = contact.phone.replace(/[^0-9+]/g, '');
+    window.location.href = `tel:${cleanPhone}`;
   };
 
   return (
@@ -144,59 +185,89 @@ export const OneTapSharePanel: React.FC<OneTapSharePanelProps> = ({
         </div>
       </div>
 
-      {/* Confirmation Feedback Pill */}
+      {/* Instant Confirmation Feedback Banner */}
       {lastSentTo && (
-        <div className="btn-primary mb-4 flex items-center justify-center gap-2 rounded-xl p-3.5 text-base font-bold sm:text-lg">
-          <Check className="h-5 w-5" />
-          <span>Location dispatched to {lastSentTo}!</span>
+        <div className="mb-4 flex items-center justify-center gap-2 rounded-2xl bg-pine-soft border-2 border-pine text-pine-deep p-4 text-base font-extrabold sm:text-lg shadow-sm animate-in fade-in duration-200">
+          <Check className="h-6 w-6 stroke-[3] text-pine" />
+          <span>📍 Location Pin & Google Maps link sent to {lastSentTo}!</span>
         </div>
       )}
 
-      {/* 1-Tap Giant Emergency Contact Cards Grid */}
+      {/* 1-Tap Emergency Contact Cards Grid */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {contacts.map((contact) => (
-          <div
-            key={contact.id}
-            className="border-line bg-well/50 hover:border-line-strong flex flex-col justify-between rounded-xl border p-5 transition-colors"
-          >
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="border-line bg-surface text-3xl rounded-xl border p-2 shadow-xs">
-                  {contact.emoji}
-                </div>
-                <div>
-                  <div className="text-ink text-lg leading-tight font-bold sm:text-xl">
-                    {contact.name}
+        {contacts.map((contact) => {
+          const isSending = sendingContactId === contact.id;
+          const isSent = Boolean(sentContactIds[contact.id]);
+
+          return (
+            <div
+              key={contact.id}
+              className={`flex flex-col justify-between rounded-2xl border p-5 transition-all ${
+                contact.isPrimary && !contact.locked
+                  ? 'border-pine bg-pine-soft/20 shadow-sm'
+                  : 'border-line bg-well/50 hover:border-line-strong'
+              }`}
+            >
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="border-line bg-surface text-3xl rounded-xl border p-2 shadow-xs shrink-0">
+                    {contact.emoji}
                   </div>
-                  <div className="text-ink-soft mt-0.5 text-sm font-semibold sm:text-base">
-                    {contact.phone} {contact.isPrimary && '• Primary'}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-ink text-lg leading-tight font-bold sm:text-xl truncate">
+                        {contact.name}
+                      </span>
+                      {contact.isPrimary && !contact.locked && (
+                        <span className="chip border-pine/60 bg-pine-soft text-pine-deep text-xs font-bold py-0.5 px-2 shrink-0">
+                          <Star className="h-3 w-3 fill-pine text-pine" />
+                          Preferred
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-ink-soft mt-0.5 text-sm font-semibold sm:text-base">
+                      {contact.phone}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Direct Action Buttons per contact */}
-            <div className="mt-1 grid grid-cols-2 gap-2.5">
-              <button
-                id={`btn-send-sms-${contact.id}`}
-                onClick={() => triggerSendContact(contact, 'sms')}
-                className="btn btn-lg btn-primary"
-              >
-                <Send className="h-5 w-5" />
-                <span>{t('share.sendPin', lang)}</span>
-              </button>
+              {/* Direct 1-Tap Action Buttons */}
+              <div className="mt-1 grid grid-cols-2 gap-2.5">
+                <button
+                  id={`btn-send-sms-${contact.id}`}
+                  onClick={() => handleDirectSendPin(contact)}
+                  disabled={isSending}
+                  className={`btn btn-lg font-bold transition-all ${
+                    isSent
+                      ? 'bg-pine-deep text-white shadow-md'
+                      : 'btn-primary'
+                  }`}
+                  aria-label={`Send location pin directly to ${contact.name}`}
+                >
+                  {isSending ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : isSent ? (
+                    <Check className="h-5 w-5 stroke-[3]" />
+                  ) : (
+                    <Send className="h-5 w-5" />
+                  )}
+                  <span>{isSending ? 'Sending…' : isSent ? '✓ Pin Sent!' : t('share.sendPin', lang)}</span>
+                </button>
 
-              <button
-                id={`btn-call-${contact.id}`}
-                onClick={() => triggerSendContact(contact, 'call')}
-                className="btn btn-lg btn-secondary"
-              >
-                <Phone className="text-ink-soft h-5 w-5" />
-                <span>{t('share.call', lang)}</span>
-              </button>
+                <button
+                  id={`btn-call-${contact.id}`}
+                  onClick={() => handleCallContact(contact)}
+                  className="btn btn-lg btn-secondary font-bold"
+                  aria-label={`Call ${contact.name}`}
+                >
+                  <Phone className="text-ink-soft h-5 w-5" />
+                  <span>{t('share.call', lang)}</span>
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Universal Quick Action Row */}

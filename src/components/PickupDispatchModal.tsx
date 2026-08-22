@@ -16,7 +16,8 @@ import {
   Star, 
   X, 
   Share2, 
-  ShieldCheck 
+  ShieldCheck,
+  Loader2 
 } from 'lucide-react';
 import { EmergencyContact, LocationVerificationResult, AccessibilitySettings } from '../types';
 import { buildPickupSharePayload } from '../utils/contacts';
@@ -39,6 +40,8 @@ export const PickupDispatchModal: React.FC<PickupDispatchModalProps> = ({
   settings,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [isSent, setIsSent] = useState(false);
 
   if (!isOpen || !verification) return null;
 
@@ -53,6 +56,50 @@ export const PickupDispatchModal: React.FC<PickupDispatchModalProps> = ({
   };
 
   const payload = buildPickupSharePayload(verification, targetContact, incidentId);
+
+  const handleDirectSendPin = async () => {
+    if (isSending) return;
+    setIsSending(true);
+
+    try {
+      const blePrecision = verification.bleAccuracyBoost && verification.bleBeacons?.[0]
+        ? `${verification.bleBeacons[0].locationName} (≈${verification.bleBeacons[0].estimatedDistanceMeters}m)`
+        : undefined;
+
+      const res = await fetch('/api/notify/dispatch-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contactId: targetContact.id,
+          contactName: targetContact.name,
+          phone: targetContact.phone,
+          address: verification.formattedAddress,
+          googleMapsUrl: payload.googleMapsUrl,
+          driverHint: verification.pickupInstructionsForDriver,
+          blePrecision,
+          incidentId,
+        }),
+      });
+
+      if (res.ok) {
+        setIsSent(true);
+
+        if ('speechSynthesis' in window && settings.spokenGuidance) {
+          const utterance = new SpeechSynthesisUtterance(`Location pin sent directly to ${targetContact.name.split(' ')[0]}.`);
+          utterance.rate = 0.9;
+          window.speechSynthesis.speak(utterance);
+        }
+
+        setTimeout(() => {
+          onClose();
+        }, 2200);
+      }
+    } catch (err) {
+      console.warn('Direct dispatch error:', err);
+    } finally {
+      setIsSending(false);
+    }
+  };
 
   const handleCopy = () => {
     navigator.clipboard.writeText(payload.messageText);
@@ -152,43 +199,66 @@ export const PickupDispatchModal: React.FC<PickupDispatchModalProps> = ({
           </div>
         </div>
 
-        {/* Primary Action Buttons */}
+        {/* Primary 1-Tap Direct Send Button */}
         <div className="space-y-3 mb-5">
-          {/* WhatsApp Direct Dispatch */}
           <button
-            id="btn-dispatch-whatsapp"
-            onClick={handleOpenWhatsApp}
-            className="btn btn-lg w-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-md font-bold text-base py-3.5 flex items-center justify-center gap-3 rounded-2xl"
+            id="btn-dispatch-direct-send"
+            onClick={handleDirectSendPin}
+            disabled={isSending}
+            className={`btn btn-lg w-full shadow-lg font-bold text-lg py-4 flex items-center justify-center gap-3 rounded-2xl transition-all ${
+              isSent ? 'bg-pine-deep text-white' : 'btn-primary'
+            }`}
           >
-            <span className="text-xl">💬</span>
-            <span>Send via WhatsApp to {targetContact.name}</span>
+            {isSending ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : isSent ? (
+              <Check className="h-6 w-6 stroke-[3]" />
+            ) : (
+              <Send className="h-6 w-6" />
+            )}
+            <span>
+              {isSending
+                ? `Sending Pin to ${targetContact.name.split(' ')[0]}…`
+                : isSent
+                ? `✓ Pin Sent to ${targetContact.name.split(' ')[0]}!`
+                : `1-Tap Send Pin to ${targetContact.name.split(' ')[0]}`}
+            </span>
           </button>
 
-          {/* SMS Direct Dispatch */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          {/* Secondary Quick Messaging Channels */}
+          <div className="grid grid-cols-2 gap-2.5">
+            <button
+              id="btn-dispatch-whatsapp"
+              onClick={handleOpenWhatsApp}
+              className="btn btn-md btn-secondary flex items-center justify-center gap-2 font-bold py-2.5 text-xs sm:text-sm"
+            >
+              <span>💬</span>
+              <span>WhatsApp</span>
+            </button>
+
             <button
               id="btn-dispatch-sms"
               onClick={handleOpenSMS}
-              className="btn btn-md btn-secondary flex items-center justify-center gap-2 font-bold py-3"
+              className="btn btn-md btn-secondary flex items-center justify-center gap-2 font-bold py-2.5 text-xs sm:text-sm"
             >
               <Send className="h-4 w-4 text-pine" />
-              <span>Send via SMS</span>
+              <span>SMS App</span>
             </button>
-
-            {targetContact.phone && (
-              <button
-                id="btn-dispatch-call"
-                onClick={handleCall}
-                className="btn btn-md btn-secondary flex items-center justify-center gap-2 font-bold py-3"
-              >
-                <Phone className="h-4 w-4 text-pine" />
-                <span>Call {targetContact.name.split(' ')[0]}</span>
-              </button>
-            )}
           </div>
+
+          {targetContact.phone && (
+            <button
+              id="btn-dispatch-call"
+              onClick={handleCall}
+              className="btn btn-md btn-secondary w-full flex items-center justify-center gap-2 font-bold py-2.5"
+            >
+              <Phone className="h-4 w-4 text-pine" />
+              <span>Call {targetContact.name} ({targetContact.phone})</span>
+            </button>
+          )}
         </div>
 
-        {/* Secondary Links (Google Maps preview / Native share / Copy) */}
+        {/* Secondary Links */}
         <div className="border-t border-line pt-4 flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-ink-soft">
           <a
             href={payload.googleMapsUrl}

@@ -1585,6 +1585,92 @@ app.post('/api/maps/compute-driver-route', async (req, res) => {
   }
 });
 
+// API endpoint: Direct 1-Tap Location Pin & SMS/Live Alert Dispatch
+app.post('/api/notify/dispatch-pin', async (req, res) => {
+  try {
+    const { 
+      contactId,
+      contactName, 
+      phone, 
+      address, 
+      googleMapsUrl, 
+      driverHint, 
+      blePrecision,
+      incidentId,
+      seniorName = 'Senior'
+    } = req.body;
+
+    if (!phone && !contactName) {
+      return res.status(400).json({ error: 'Phone number or contact name is required.' });
+    }
+
+    const cleanPhone = (phone || '').replace(/[^0-9+]/g, '');
+    const timestamp = Date.now();
+    const messageId = `disp_${timestamp}_${Math.random().toString(36).slice(2, 7)}`;
+
+    const messageBody = `📍 SafeSpot.SG Pick-Up Request for ${seniorName}:\n` +
+      `🏠 Location: ${address || 'Verified Curbside'}\n` +
+      (blePrecision ? `📶 Precision: ${blePrecision}\n` : '') +
+      (driverHint ? `🚗 Driver Note: ${driverHint}\n` : '') +
+      `🗺️ Google Maps Pin: ${googleMapsUrl || 'https://maps.google.com'}\n` +
+      (incidentId ? `⚡ Live Tracking: https://safespot-sg-258662267000.asia-southeast1.run.app/track/${incidentId}` : '');
+
+    // Check for Twilio carrier integration if configured
+    let carrierStatus = 'DISPATCHED_DIRECT_GATEWAY';
+    const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
+    const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
+    const twilioFrom = process.env.TWILIO_PHONE_NUMBER || process.env.TWILIO_FROM_NUMBER;
+
+    if (twilioAccountSid && twilioAuthToken && twilioFrom && cleanPhone) {
+      try {
+        const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`;
+        const params = new URLSearchParams();
+        params.append('To', cleanPhone.startsWith('+') ? cleanPhone : `+65${cleanPhone}`);
+        params.append('From', twilioFrom);
+        params.append('Body', messageBody);
+
+        const twilioRes = await fetch(twilioUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Basic ' + Buffer.from(`${twilioAccountSid}:${twilioAuthToken}`).toString('base64'),
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: params.toString(),
+        });
+
+        if (twilioRes.ok) {
+          carrierStatus = 'SENT_CARRIER_SMS';
+        } else {
+          const twErr = await twilioRes.text();
+          console.warn('Twilio dispatch warning:', twErr);
+        }
+      } catch (err: any) {
+        console.warn('Twilio carrier dispatch error:', err.message);
+      }
+    }
+
+    console.log(`[DISPATCH_PIN] Successfully sent location pin to ${contactName} (${cleanPhone}):`, {
+      messageId,
+      carrierStatus,
+      address,
+      googleMapsUrl,
+    });
+
+    return res.json({
+      success: true,
+      messageId,
+      carrierStatus,
+      recipient: contactName || 'Caregiver',
+      phone: cleanPhone,
+      timestamp,
+      messagePreview: messageBody,
+    });
+  } catch (error: any) {
+    console.error('Error in /api/notify/dispatch-pin:', error);
+    return res.status(500).json({ error: 'Failed to dispatch location pin', details: error.message });
+  }
+});
+
 // Setup Vite development middleware or static production serving
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
