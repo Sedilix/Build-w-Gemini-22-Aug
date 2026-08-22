@@ -257,7 +257,7 @@ export const CaregiverLiveTracker: React.FC<CaregiverLiveTrackerProps> = ({ inci
       </main>
 
       <footer className="border-line text-ink-soft border-t px-4 py-5 text-center text-sm font-medium">
-        Senior SafeSpot • Live incident {incidentId} • Auto-refreshes in real time
+        SafeSpot.SG • Live incident {incidentId} • Auto-refreshes in real time
       </footer>
     </div>
   );

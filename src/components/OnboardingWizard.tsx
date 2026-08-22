@@ -169,44 +169,62 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 
   return (
     <div className="bg-bg text-ink flex min-h-dvh flex-col">
-      {/* Progress */}
-      <header className="border-line bg-surface/95 sticky top-0 z-10 border-b px-4 py-3 backdrop-blur-md sm:px-6">
-        <div className="mx-auto flex max-w-2xl items-center gap-3">
-          <AppLogo size={32} />
-          <div className="min-w-0 flex-1">
-            <div className="font-display truncate text-base font-bold sm:text-lg">Senior SafeSpot</div>
-            <div className="bg-well mt-1.5 h-1.5 overflow-hidden rounded-full">
-              <div
-                className="bg-pine h-full rounded-full transition-all duration-300"
-                style={{ width: `${((stepIndex + 1) / STEP_ORDER.length) * 100}%` }}
-              />
-            </div>
-          </div>
-          {step !== 'welcome' && (
-            <button onClick={onSkip} className="text-ink-faint hover:text-ink shrink-0 text-sm font-bold">
-              {t('onboard.skip', lang)}
+      {/* Progress Header — only shown on steps 2-4, padded safely below iOS/Android status bar */}
+      {step !== 'welcome' && (
+        <header className="border-line bg-surface/95 sticky top-0 z-10 border-b px-4 pb-3 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] backdrop-blur-md sm:px-6">
+          <div className="mx-auto flex max-w-2xl items-center gap-3">
+            <button
+              type="button"
+              onClick={goBack}
+              className="text-ink-soft hover:bg-well hover:text-ink -ml-1 rounded-xl p-1.5 transition-colors"
+              aria-label={t('onboard.back', lang)}
+            >
+              <ArrowLeft className="h-5 w-5" />
             </button>
-          )}
-        </div>
-      </header>
 
-      <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
-        {step === 'welcome' && (
-          <div className="flex flex-col items-center gap-5 py-8 text-center">
-            <AppLogo size={88} />
-            <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
-              {t('onboard.welcomeTitle', lang)}
-            </h1>
-            <p className="text-ink-soft max-w-md text-lg leading-relaxed">
-              {t('onboard.welcomeBody', lang)}
-            </p>
-            <button onClick={goNext} className="btn btn-lg btn-primary mt-2 w-full max-w-xs">
-              {t('onboard.start', lang)}
-              <ArrowRight className="h-5 w-5" />
-            </button>
-            <button onClick={onSkip} className="text-ink-faint hover:text-ink text-sm font-bold">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between text-xs font-bold text-ink-soft mb-1">
+                <span className="truncate">
+                  {step === 'profile' ? t('onboard.stepProfile', lang) : step === 'places' ? t('onboard.stepPlaces', lang) : t('onboard.stepContacts', lang)}
+                </span>
+                <span className="shrink-0">{stepIndex} / {STEP_ORDER.length - 1}</span>
+              </div>
+              <div className="bg-well h-1.5 overflow-hidden rounded-full">
+                <div
+                  className="bg-pine h-full rounded-full transition-all duration-300"
+                  style={{ width: `${(stepIndex / (STEP_ORDER.length - 1)) * 100}%` }}
+                />
+              </div>
+            </div>
+
+            <button onClick={onSkip} className="text-ink-faint hover:text-ink shrink-0 text-sm font-bold pl-1">
               {t('onboard.skip', lang)}
             </button>
+          </div>
+        </header>
+      )}
+
+      <main className={`mx-auto w-full max-w-2xl flex-1 px-4 py-6 sm:px-6 sm:py-8 ${step === 'welcome' ? 'pt-[calc(env(safe-area-inset-top,0px)+2.5rem)] flex flex-col justify-center' : ''}`}>
+        {step === 'welcome' && (
+          <div className="flex flex-col items-center gap-6 py-6 text-center">
+            <AppLogo size={96} />
+            <div className="space-y-2">
+              <h1 className="font-display text-3xl sm:text-5xl font-black tracking-tight text-ink">
+                {t('onboard.welcomeTitle', lang)}
+              </h1>
+              <p className="text-ink-soft max-w-md text-base sm:text-lg leading-relaxed mx-auto">
+                {t('onboard.welcomeBody', lang)}
+              </p>
+            </div>
+            <div className="w-full max-w-xs space-y-3 pt-2">
+              <button onClick={goNext} className="btn btn-lg btn-primary w-full shadow-lg">
+                {t('onboard.start', lang)}
+                <ArrowRight className="h-5 w-5" />
+              </button>
+              <button onClick={onSkip} className="text-ink-faint hover:text-ink text-sm font-bold block w-full py-1">
+                {t('onboard.skip', lang)}
+              </button>
+            </div>
           </div>
         )}
 

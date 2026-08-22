@@ -985,7 +985,7 @@ function SeniorSafeSpotHome() {
       {/* Footer Accessibility Notice */}
       <footer className="border-line text-ink-soft border-t px-4 py-6 text-center text-sm font-medium sm:text-base">
         <p>
-          Senior SafeSpot • Multimodal Location & Pickup Assistant • Powered by Gemini AI, Speechmatics & Firebase
+          SafeSpot.SG • Multimodal Location & Pickup Assistant • Powered by Gemini AI, Speechmatics & Firebase
         </p>
       </footer>
     </div>

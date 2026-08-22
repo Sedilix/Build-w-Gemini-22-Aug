@@ -904,7 +904,7 @@ app.post('/api/gemini/voice-assistant', async (req, res) => {
     const contactsList = emergencyContacts.map((c: any) => `${c.name} (${c.relationship})`).join(', ');
 
     const prompt = `
-You are the empathetic, senior-friendly voice intelligence engine for "Senior SafeSpot Singapore".
+You are the empathetic, senior-friendly voice intelligence engine for "SafeSpot.SG".
 The elder spoke the following transcript transcribed by Speechmatics:
 "${transcript}"
 
@@ -1091,7 +1091,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Senior SafeSpot Server running on http://0.0.0.0:${PORT}`);
+    console.log(`SafeSpot.SG Server running on http://0.0.0.0:${PORT}`);
   });
 }
 

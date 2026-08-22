@@ -62,7 +62,7 @@ export const OneTapSharePanel: React.FC<OneTapSharePanelProps> = ({
     if (navigator.share && shareUrls) {
       try {
         await navigator.share({
-          title: 'Senior SafeSpot Live Pickup Location',
+          title: 'SafeSpot.SG Live Pickup Location',
           text: `I need a pickup at: ${address}. Driver instructions: ${verification?.pickupInstructionsForDriver || ''}`,
           url: shareUrls.googleMapsUrl,
         });

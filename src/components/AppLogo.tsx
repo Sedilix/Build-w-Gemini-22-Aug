@@ -22,7 +22,7 @@ export const AppLogo: React.FC<AppLogoProps> = ({ size = 40, className = '' }) =
     height={size}
     viewBox="0 0 100 100"
     role="img"
-    aria-label="Senior SafeSpot Singapore"
+    aria-label="SafeSpot.SG"
     className={`shrink-0 rounded-[22%] ${className}`}
   >
     <rect width="100" height="100" rx="22" fill="#0b0b0d" />

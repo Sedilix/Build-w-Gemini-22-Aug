@@ -128,10 +128,10 @@ export const TRANSLATIONS: Record<string, Partial<Record<Language, string>>> = {
 
   // ── First-launch Onboarding ─────────────────────────────────────────────
   'onboard.welcomeTitle': {
-    en: 'Welcome to Senior SafeSpot',
-    zh: '欢迎使用 Senior SafeSpot',
-    ms: 'Selamat datang ke Senior SafeSpot',
-    ta: 'Senior SafeSpot-க்கு வரவேற்கிறோம்',
+    en: 'Welcome to SafeSpot.SG',
+    zh: '欢迎使用 SafeSpot.SG',
+    ms: 'Selamat datang ke SafeSpot.SG',
+    ta: 'SafeSpot.SG-க்கு வரவேற்கிறோம்',
   },
   'onboard.welcomeBody': {
     en: 'Let us set up your details once. Then getting picked up is a single tap.',

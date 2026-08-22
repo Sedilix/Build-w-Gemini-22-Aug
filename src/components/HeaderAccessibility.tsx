@@ -81,7 +81,7 @@ export const HeaderAccessibility: React.FC<HeaderAccessibilityProps> = ({
   return (
     <header
       id="app-header-accessibility"
-      className="border-line bg-surface/95 text-ink sticky top-0 z-40 border-b px-3 py-2.5 backdrop-blur-md transition-colors sm:px-8 sm:py-3.5"
+      className="border-line bg-surface/95 text-ink sticky top-0 z-40 border-b px-3 pb-2.5 pt-[calc(env(safe-area-inset-top,0px)+0.6rem)] backdrop-blur-md transition-colors sm:px-8 sm:py-3.5"
     >
       <div className="mx-auto flex max-w-7xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-6 sm:gap-y-3">
         {/* Row 1 on mobile: brand and the one action that must never be hunted for */}
@@ -91,7 +91,7 @@ export const HeaderAccessibility: React.FC<HeaderAccessibilityProps> = ({
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <h1 className="font-display truncate text-lg leading-none font-bold tracking-tight sm:text-[1.7rem]">
-                  Senior SafeSpot
+                  SafeSpot.SG
                 </h1>
                 {/* Redundant with the SOS button on a narrow screen */}
                 <span className="chip border-pine/40 bg-pine-soft text-pine-deep hidden sm:inline-flex">

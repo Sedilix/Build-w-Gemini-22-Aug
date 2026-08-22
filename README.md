@@ -1,6 +1,6 @@
-# Senior SafeSpot - Visual Location & Pickup Assistant
+# SafeSpot.SG - Visual Location & Pickup Assistant
 
-An elder-friendly Singapore live location and pickup assistant powered by **Gemini AI**, **Speechmatics Realtime Voice Engine (STT & TTS)**, and **Google Maps Platform** (Street View, Places, Roads, and Geocoding APIs).
+A Singapore live location and pickup assistant powered by **Gemini AI**, **Speechmatics Realtime Voice Engine (STT & TTS)**, and **Google Maps Platform** (Street View, Places, Roads, and Geocoding APIs).
 
 ---
 
