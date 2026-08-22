@@ -14,6 +14,7 @@ import {
   Trash2,
   UserRound,
   BookUser,
+  Star,
 } from 'lucide-react';
 import {
   AccessibilitySettings,
@@ -25,7 +26,7 @@ import {
 import { AppLogo } from './AppLogo';
 import { AddressAutocompleteInput } from './AddressAutocompleteInput';
 import { EMERGENCY_995_CONTACT, ensureEmergency995 } from '../data/defaultContacts';
-import { importContactsFromPhone, isContactPickerSupported, createManualContact } from '../utils/contacts';
+import { importContactsFromPhone, isContactPickerSupported, createManualContact, getPreferredContact, setPreferredContact } from '../utils/contacts';
 import { SAVED_PLACE_KINDS, SAVED_PLACE_META } from '../utils/places';
 import { t } from '../locales/translations';
 
@@ -450,6 +451,15 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               </p>
             </div>
 
+            {/* Preferred Contact Explanation Banner */}
+            <div className="rounded-xl border border-pine/30 bg-pine-soft p-3.5 text-pine-deep flex items-start gap-2.5 text-xs sm:text-sm">
+              <Star className="h-5 w-5 shrink-0 fill-pine text-pine mt-0.5" />
+              <div>
+                <span className="font-bold">⭐ Preferred Pick-Up Contact: </span>
+                <span>When you tap <strong>"Pick Me Up Here"</strong>, your live Google Maps pin, verified address, and driver pickup note are instantly sent to this person.</span>
+              </div>
+            </div>
+
             {/* Import from the phone's address book where the browser allows it */}
             {isContactPickerSupported() && (
               <button onClick={handleImportContacts} className="btn btn-lg btn-secondary w-full">
@@ -465,32 +475,59 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               {contacts.map((c) => (
                 <li
                   key={c.id}
-                  className="border-line bg-well/50 flex items-center gap-3 rounded-xl border p-3"
+                  className={`flex items-center gap-3 rounded-xl border p-3.5 transition-all ${
+                    c.isPrimary && !c.locked
+                      ? 'border-pine bg-pine-soft/40 shadow-sm'
+                      : 'border-line bg-well/50'
+                  }`}
                 >
-                  <span className="text-xl" aria-hidden="true">
+                  <span className="text-2xl" aria-hidden="true">
                     {c.emoji}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-base font-bold">{c.name}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-base font-bold text-ink">{c.name}</span>
+                      {c.isPrimary && !c.locked && (
+                        <span className="chip border-pine/50 bg-pine-soft text-pine-deep text-xs font-bold py-0.5 px-2">
+                          <Star className="h-3 w-3 fill-pine text-pine" />
+                          Preferred
+                        </span>
+                      )}
+                    </div>
                     <div className="text-ink-soft truncate text-sm">
                       {c.relationship} · {c.phone}
                     </div>
                   </div>
+
                   {c.locked ? (
                     <span
-                      className="text-ink-faint flex shrink-0 items-center gap-1 text-xs font-bold"
+                      className="text-ink-faint flex shrink-0 items-center gap-1 text-xs font-bold px-2"
                       title={t('onboard.emergencyLocked', lang)}
                     >
                       <Lock className="h-3.5 w-3.5" />
                     </span>
                   ) : (
-                    <button
-                      onClick={() => handleRemoveContact(c.id)}
-                      className="text-brick hover:bg-brick-soft shrink-0 rounded-lg p-2 transition-colors"
-                      aria-label={`Remove ${c.name}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {!c.isPrimary ? (
+                        <button
+                          type="button"
+                          onClick={() => setContacts(setPreferredContact(contacts, c.id))}
+                          className="text-xs font-bold text-ink-soft hover:text-pine hover:bg-pine-soft/50 border border-line rounded-lg px-2 py-1.5 flex items-center gap-1 transition-colors"
+                          title="Set as preferred pickup recipient"
+                        >
+                          <Star className="h-3.5 w-3.5" />
+                          <span className="hidden sm:inline">Set Preferred</span>
+                        </button>
+                      ) : null}
+
+                      <button
+                        onClick={() => handleRemoveContact(c.id)}
+                        className="text-brick hover:bg-brick-soft rounded-lg p-2 transition-colors"
+                        aria-label={`Remove ${c.name}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   )}
                 </li>
               ))}

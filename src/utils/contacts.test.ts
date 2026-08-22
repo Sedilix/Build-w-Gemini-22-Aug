@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { normalisePhone, isSamePhone, createManualContact } from './contacts';
+import { normalisePhone, isSamePhone, createManualContact, getPreferredContact, setPreferredContact } from './contacts';
 import { ensureEmergency995, EMERGENCY_995_CONTACT } from '../data/defaultContacts';
 import { EmergencyContact } from '../types';
 
@@ -88,5 +88,55 @@ describe('ensureEmergency995', () => {
   it('preserves the family contacts alongside it', () => {
     const result = ensureEmergency995(family);
     expect(result.some((c) => c.name === 'Sarah')).toBe(true);
+  });
+});
+
+describe('getPreferredContact & setPreferredContact', () => {
+  const contacts: EmergencyContact[] = [
+    {
+      id: 'emergency-995',
+      name: '995 SCDF Ambulance',
+      relationship: 'Emergency Response',
+      phone: '995',
+      emoji: '🚨',
+      bgColor: 'bg-red-600',
+      isPrimary: false,
+      locked: true,
+    },
+    {
+      id: 'contact-sarah',
+      name: 'Sarah',
+      relationship: 'Daughter',
+      phone: '91234567',
+      emoji: '👩',
+      bgColor: 'bg-pine',
+      isPrimary: true,
+    },
+    {
+      id: 'contact-john',
+      name: 'John',
+      relationship: 'Son',
+      phone: '98765432',
+      emoji: '👨',
+      bgColor: 'bg-sky',
+      isPrimary: false,
+    },
+  ];
+
+  it('identifies the primary non-locked contact as preferred', () => {
+    const preferred = getPreferredContact(contacts);
+    expect(preferred?.id).toBe('contact-sarah');
+    expect(preferred?.name).toBe('Sarah');
+  });
+
+  it('switches the preferred contact cleanly', () => {
+    const updated = setPreferredContact(contacts, 'contact-john');
+    expect(getPreferredContact(updated)?.id).toBe('contact-john');
+    expect(updated.find((c) => c.id === 'contact-sarah')?.isPrimary).toBe(false);
+  });
+
+  it('never returns locked 995 as the preferred family contact', () => {
+    const only995: EmergencyContact[] = [contacts[0]];
+    expect(getPreferredContact(only995)).toBeUndefined();
   });
 });

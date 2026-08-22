@@ -43,6 +43,9 @@ import {
 import { 
   ProfileModal 
 } from './components/ProfileModal';
+import {
+  PickupDispatchModal
+} from './components/PickupDispatchModal';
 import { 
   GPSLocation, 
   LocationVerificationResult, 
@@ -69,6 +72,7 @@ import {
   CrashEventData 
 } from './utils/fallDetection';
 import { getBeaconsForVerification, startBeaconScan, stopBeaconScan, updateBeaconsFromGps } from './utils/ble';
+import { getPreferredContact } from './utils/contacts';
 import { resolveSavedPlace } from './utils/places';
 import { auth, subscribeToUserProfile, saveUserProfile, createIncident, updateIncident } from './lib/firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
@@ -149,6 +153,7 @@ function SeniorSafeSpotHome() {
   const [isCaregiverPreviewOpen, setIsCaregiverPreviewOpen] = useState(false);
   const [isContactsModalOpen, setIsContactsModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isPickupDispatchOpen, setIsPickupDispatchOpen] = useState(false);
   const [emergencyCountdown, setEmergencyCountdown] = useState<number | null>(null);
 
   // State: Battery telemetry, live incident & fall detection
@@ -251,7 +256,8 @@ function SeniorSafeSpotHome() {
       coords: { latitude: number; longitude: number; accuracy?: number; heading?: number; altitude?: number; speed?: number },
       photoBase64?: string | null,
       voiceClue?: string,
-      preset?: LocationPreset
+      preset?: LocationPreset,
+      isFromPickMeUp = false
     ) => {
       setIsVerifyingAI(true);
       try {
@@ -277,11 +283,21 @@ function SeniorSafeSpotHome() {
           const data: LocationVerificationResult = await res.json();
           setVerification(data);
 
+          // If triggered by "Pick Me Up Here!", open the instant dispatch modal for the preferred contact
+          if (isFromPickMeUp) {
+            setIsPickupDispatchOpen(true);
+          }
+
           // Audio speech feedback for senior
           if (settings.spokenGuidance && data.elderlyVoiceSummary) {
             setIsSpeaking(true);
+            const preferred = getPreferredContact(contacts);
+            const summaryWithPreferred = isFromPickMeUp && preferred
+              ? `${data.elderlyVoiceSummary} Ready to send pickup pin to ${preferred.name.split(' ')[0]}.`
+              : data.elderlyVoiceSummary;
+
             speakSpeechmaticsOrFallback(
-              data.elderlyVoiceSummary, 
+              summaryWithPreferred, 
               settings.speechmaticsVoice || 'sarah', 
               () => setIsSpeaking(false),
               settings.speechmaticsRate ?? 0.85,
@@ -295,7 +311,7 @@ function SeniorSafeSpotHome() {
         setIsVerifyingAI(false);
       }
     },
-    [currentPhoto, settings.spokenGuidance, settings.speechmaticsVoice, settings.speechmaticsRate, settings.language]
+    [contacts, currentPhoto, settings.spokenGuidance, settings.speechmaticsVoice, settings.speechmaticsRate, settings.language]
   );
 
   // Acquire Live GPS
@@ -358,14 +374,14 @@ function SeniorSafeSpotHome() {
       // start a Bluetooth scan from. Fire and forget: beacons take a moment to
       // arrive, so this tap warms the scan for subsequent verifications rather
       // than blocking this one.
-      void startBeaconScan();
+      void startBeaconScan(gps || undefined);
 
       const runVerification = (coords: GPSLocation) => {
         const photoToUse = snappedPhotoBase64 || currentPhoto;
         if (snappedPhotoBase64) {
           setCurrentPhoto(snappedPhotoBase64);
         }
-        triggerLocationVerification(coords, photoToUse, '');
+        triggerLocationVerification(coords, photoToUse, '', undefined, true);
       };
 
       // "I'm at home / work / my clinic": trust the senior's own saved place
@@ -981,6 +997,15 @@ function SeniorSafeSpotHome() {
           setIsProfileModalOpen(false);
           setIsContactsModalOpen(true);
         }}
+        settings={settings}
+      />
+
+      <PickupDispatchModal
+        isOpen={isPickupDispatchOpen}
+        onClose={() => setIsPickupDispatchOpen(false)}
+        verification={verification}
+        preferredContact={getPreferredContact(contacts)}
+        incidentId={activeIncidentId || undefined}
         settings={settings}
       />
 

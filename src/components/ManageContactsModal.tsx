@@ -4,10 +4,10 @@
  */
 
 import React, { useState } from 'react';
-import { X, Plus, Trash2, UserPlus, Lock, BookUser } from 'lucide-react';
+import { X, Plus, Trash2, UserPlus, Lock, BookUser, Star } from 'lucide-react';
 import { EmergencyContact, AccessibilitySettings } from '../types';
 import { ensureEmergency995 } from '../data/defaultContacts';
-import { importContactsFromPhone, isContactPickerSupported } from '../utils/contacts';
+import { importContactsFromPhone, isContactPickerSupported, setPreferredContact } from '../utils/contacts';
 
 interface ManageContactsModalProps {
   isOpen: boolean;
@@ -38,6 +38,7 @@ export const ManageContactsModal: React.FC<ManageContactsModalProps> = ({
   const handleAdd = () => {
     if (!newName.trim() || !newPhone.trim()) return;
 
+    const nonEmergencyCount = list.filter((c) => !c.locked).length;
     const newContact: EmergencyContact = {
       id: `contact-${Date.now()}`,
       name: `${newName.trim()} (${newRelationship})`,
@@ -45,7 +46,7 @@ export const ManageContactsModal: React.FC<ManageContactsModalProps> = ({
       phone: newPhone.trim(),
       emoji: newEmoji,
       bgColor: 'bg-emerald-600 hover:bg-emerald-700 text-white',
-      isPrimary: false,
+      isPrimary: nonEmergencyCount === 0,
     };
 
     const updated = [...list, newContact];
@@ -58,7 +59,15 @@ export const ManageContactsModal: React.FC<ManageContactsModalProps> = ({
   const handleDelete = (id: string) => {
     // ensureEmergency995 re-seats the locked SCDF entry even if something else
     // removed it; the delete button is not rendered for locked contacts.
-    const updated = ensureEmergency995(list.filter((c) => c.id !== id));
+    const remaining = list.filter((c) => c.id !== id);
+    // If the deleted contact was primary, designate the first remaining non-locked contact as primary
+    let updated = ensureEmergency995(remaining);
+    if (!updated.some((c) => c.isPrimary && !c.locked)) {
+      const firstFamily = updated.find((c) => !c.locked);
+      if (firstFamily) {
+        updated = setPreferredContact(updated, firstFamily.id);
+      }
+    }
     setList(updated);
     onSaveContacts(updated);
   };
@@ -111,39 +120,76 @@ export const ManageContactsModal: React.FC<ManageContactsModalProps> = ({
           </button>
         </div>
 
+        {/* Explainer Banner */}
+        <div className="rounded-xl border border-pine/30 bg-pine-soft p-3.5 text-pine-deep flex items-start gap-2.5 text-xs sm:text-sm mb-4">
+          <Star className="h-5 w-5 shrink-0 fill-pine text-pine mt-0.5" />
+          <div>
+            <span className="font-bold">⭐ Preferred Pick-Up Person: </span>
+            <span>The person marked as <strong>Preferred</strong> will automatically receive your live Google Maps pin and pickup instructions whenever you tap "Pick Me Up Here".</span>
+          </div>
+        </div>
+
         {/* Existing Contacts List */}
         <div className="mb-6 space-y-2.5">
           <div className="section-kicker mb-2 text-sm">Current Contacts ({list.length})</div>
           {list.map((c) => (
             <div
               key={c.id}
-              className="border-line bg-well/50 flex items-center justify-between gap-3 rounded-xl border p-4"
+              className={`flex items-center justify-between gap-3 rounded-xl border p-4 transition-all ${
+                c.isPrimary && !c.locked ? 'border-pine bg-pine-soft/40 shadow-sm' : 'border-line bg-well/50'
+              }`}
             >
-              <div className="flex items-center gap-3">
-                <span className="border-line bg-surface rounded-lg border p-1.5 text-2xl">{c.emoji}</span>
-                <div>
-                  <div className="text-ink text-base leading-tight font-bold sm:text-lg">{c.name}</div>
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="border-line bg-surface rounded-lg border p-1.5 text-2xl shrink-0">{c.emoji}</span>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-ink text-base leading-tight font-bold sm:text-lg truncate">{c.name}</span>
+                    {c.isPrimary && !c.locked && (
+                      <span className="chip border-pine/60 bg-pine-soft text-pine-deep text-xs font-bold py-0.5 px-2 shrink-0">
+                        <Star className="h-3 w-3 fill-pine text-pine" />
+                        Preferred
+                      </span>
+                    )}
+                  </div>
                   <div className="text-ink-soft mt-0.5 text-sm font-semibold">{c.phone}</div>
                 </div>
               </div>
 
               {c.locked ? (
                 <span
-                  className="text-ink-faint flex items-center gap-1.5 px-2 text-xs font-bold"
+                  className="text-ink-faint flex items-center gap-1.5 px-2 text-xs font-bold shrink-0"
                   title="Singapore SCDF emergency line — always available and cannot be removed"
                 >
                   <Lock className="h-4 w-4" />
                   <span className="hidden sm:inline">Always on</span>
                 </span>
               ) : (
-                <button
-                  onClick={() => handleDelete(c.id)}
-                  className="text-brick hover:bg-brick-soft rounded-lg p-2.5 transition-colors"
-                  title="Remove Contact"
-                  aria-label={`Remove ${c.name}`}
-                >
-                  <Trash2 className="h-5 w-5" />
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  {!c.isPrimary ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updated = setPreferredContact(list, c.id);
+                        setList(updated);
+                        onSaveContacts(updated);
+                      }}
+                      className="text-xs font-bold text-ink-soft hover:text-pine hover:bg-pine-soft/50 border border-line rounded-lg px-2.5 py-1.5 flex items-center gap-1 transition-colors"
+                      title="Set as Preferred Pick-Up Contact"
+                    >
+                      <Star className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Set Preferred</span>
+                    </button>
+                  ) : null}
+
+                  <button
+                    onClick={() => handleDelete(c.id)}
+                    className="text-brick hover:bg-brick-soft rounded-lg p-2.5 transition-colors"
+                    title="Remove Contact"
+                    aria-label={`Remove ${c.name}`}
+                  >
+                    <Trash2 className="h-5 w-5" />
+                  </button>
+                </div>
               )}
             </div>
           ))}

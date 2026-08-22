@@ -3,15 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { EmergencyContact } from '../types';
+import { EmergencyContact, LocationVerificationResult } from '../types';
 
 /**
  * Import emergency contacts straight from the phone's address book via the
  * Contact Picker API, so a senior never has to type a phone number.
- *
- * The picker is Android Chrome only and needs a secure context and a user
- * gesture; every other browser falls back to entering contacts by hand, which
- * is why {@link isContactPickerSupported} is checked before the button is shown.
  */
 
 interface ContactsManagerLike {
@@ -115,7 +111,6 @@ export async function importContactsFromPhone(
 
     return { imported, duplicates };
   } catch (err: any) {
-    // Dismissing the picker is a normal outcome, not a failure worth shouting about.
     if (err?.name === 'AbortError') {
       return { imported: [], duplicates: 0 };
     }
@@ -132,7 +127,8 @@ export function createManualContact(
   name: string,
   phone: string,
   existingCount: number,
-  relationship = 'Family / Friend'
+  relationship = 'Family / Friend',
+  isPrimary = false
 ): EmergencyContact {
   return {
     id: `contact-${Date.now()}`,
@@ -141,6 +137,72 @@ export function createManualContact(
     phone: normalisePhone(phone),
     emoji: CONTACT_EMOJI[existingCount % CONTACT_EMOJI.length],
     bgColor: CONTACT_COLORS[existingCount % CONTACT_COLORS.length],
-    isPrimary: existingCount === 0,
+    isPrimary: isPrimary || existingCount === 0,
+  };
+}
+
+/**
+ * Returns the preferred contact designated by the user during onboarding or in settings.
+ * Skips locked emergency services like 995.
+ */
+export function getPreferredContact(contacts: EmergencyContact[]): EmergencyContact | undefined {
+  if (!contacts || contacts.length === 0) return undefined;
+  const primary = contacts.find((c) => c.isPrimary && !c.locked);
+  if (primary) return primary;
+  return contacts.find((c) => !c.locked);
+}
+
+/**
+ * Sets a specific contact as the preferred pickup recipient and unsets all others.
+ */
+export function setPreferredContact(contacts: EmergencyContact[], targetId: string): EmergencyContact[] {
+  return contacts.map((c) => ({
+    ...c,
+    isPrimary: c.id === targetId,
+  }));
+}
+
+/**
+ * Prepares the formatted text message and deep links (WhatsApp / SMS / Call)
+ * for sharing live pickup coordinates with the preferred contact.
+ */
+export function buildPickupSharePayload(
+  verification: LocationVerificationResult,
+  contact: EmergencyContact,
+  incidentId?: string
+): {
+  messageText: string;
+  whatsappUrl: string;
+  smsUrl: string;
+  telUrl: string;
+  googleMapsUrl: string;
+} {
+  const address = verification.formattedAddress || 'My Current Location';
+  const driverHint = verification.pickupInstructionsForDriver || 'Please pull up to the exact pin location.';
+  const googleMapsUrl =
+    verification.shareUrls?.googleMapsUrl ||
+    `https://www.google.com/maps/search/?api=1&query=${verification.verifiedCoordinates.lat},${verification.verifiedCoordinates.lng}`;
+
+  const liveTrackPart = incidentId
+    ? `\n⚡ Live Tracking: ${window.location.origin}/track/${incidentId}`
+    : '';
+
+  const bleBadge = verification.bleAccuracyBoost && verification.bleBeacons?.[0]
+    ? `\n📶 BLE Precision: ${verification.bleBeacons[0].locationName} (≈${verification.bleBeacons[0].estimatedDistanceMeters}m)`
+    : '';
+
+  const messageText = `Hi ${contact.name}! I need a pickup here:\n📍 SafeSpot: ${address}${bleBadge}\n🚗 Driver Note: ${driverHint}\n🗺️ Google Maps: ${googleMapsUrl}${liveTrackPart}`;
+
+  const cleanPhone = contact.phone.replace(/[^0-9+]/g, '');
+  const digitsOnly = contact.phone.replace(/[^0-9]/g, '');
+
+  const encoded = encodeURIComponent(messageText);
+
+  return {
+    messageText,
+    whatsappUrl: `https://wa.me/${digitsOnly}?text=${encoded}`,
+    smsUrl: `sms:${cleanPhone}?&body=${encoded}`,
+    telUrl: `tel:${cleanPhone}`,
+    googleMapsUrl,
   };
 }
