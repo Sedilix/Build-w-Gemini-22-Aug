@@ -84,6 +84,24 @@ export interface EmergencyContact {
   notes?: string;
 }
 
+export type BloodType = 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-' | 'Unknown';
+
+export interface UserProfile {
+  uid: string;
+  actualName: string;
+  dob: string; // e.g. YYYY-MM-DD or DD/MM/YYYY
+  bloodType: BloodType;
+  address: string; // Home address e.g. "Blk 123 Toa Payoh Lorong 1 #08-456, Singapore 310123"
+  selfiePhotoUrl?: string; // Selfie photo base64 / URL
+  emergencyContacts: EmergencyContact[];
+  phone?: string;
+  email?: string;
+  authProvider: 'google' | 'phone' | 'anonymous';
+  medicalNotes?: string; // Optional allergies or medical conditions (e.g., "Diabetic, Pacemaker")
+  createdAt: number;
+  updatedAt: number;
+}
+
 export type HighContrastTheme = 'normal' | 'yellow-black' | 'black-white' | 'warm-soft';
 
 export type FontSizeLevel = 'standard' | 'large' | 'extra-large';
@@ -91,7 +109,7 @@ export type FontSizeLevel = 'standard' | 'large' | 'extra-large';
 export interface SpeechmaticsVoiceOption {
   id: string;
   name: string;
-  gender: 'female' | 'male';
+  gender: 'female' | 'male' | 'neutral';
   accent: string;
   flag: string;
   tone: string;
@@ -100,6 +118,8 @@ export interface SpeechmaticsVoiceOption {
   isRecommended?: boolean;
 }
 
+// NOTE: Matches the 4 voices currently supported by Speechmatics TTS preview.
+// See https://docs.speechmatics.com/text-to-speech/quickstart#voices
 export const SPEECHMATICS_VOICE_OPTIONS: SpeechmaticsVoiceOption[] = [
   {
     id: 'sarah',
@@ -107,20 +127,10 @@ export const SPEECHMATICS_VOICE_OPTIONS: SpeechmaticsVoiceOption[] = [
     gender: 'female',
     accent: 'British (UK)',
     flag: '🇬🇧',
-    tone: 'Friendly & Warm',
-    description: 'Empathetic, clear, and reassuring tone. Highly recommended for elderly users and emergency assistance.',
+    tone: 'Crisp & Professional',
+    description: 'Clear, reassuring, and professional female voice. Highly recommended for elderly users and emergency assistance.',
     sampleText: 'Hello! I am Sarah. You are safe. I will help you verify your location and notify your family.',
     isRecommended: true,
-  },
-  {
-    id: 'jack',
-    name: 'Jack',
-    gender: 'male',
-    accent: 'American (US)',
-    flag: '🇺🇸',
-    tone: 'Deep & Clear',
-    description: 'Support specialist voice with steady, authoritative, and articulate pacing.',
-    sampleText: 'Hello, this is Jack. I have verified your GPS coordinates and pickup point on the map.',
   },
   {
     id: 'megan',
@@ -128,8 +138,8 @@ export const SPEECHMATICS_VOICE_OPTIONS: SpeechmaticsVoiceOption[] = [
     gender: 'female',
     accent: 'American (US)',
     flag: '🇺🇸',
-    tone: 'Gentle & Natural',
-    description: 'Clear companion voice with gentle inflection and smooth conversational cadence.',
+    tone: 'Dynamic & Conversational',
+    description: 'Clear female companion voice with gentle inflection and smooth conversational cadence.',
     sampleText: 'Hi there, I am Megan. Please stay sheltered on the bench while your driver arrives.',
   },
   {
@@ -138,29 +148,19 @@ export const SPEECHMATICS_VOICE_OPTIONS: SpeechmaticsVoiceOption[] = [
     gender: 'male',
     accent: 'British (UK)',
     flag: '🇬🇧',
-    tone: 'Calm & Trustworthy',
-    description: 'Trusted presenter voice with distinct British pronunciation and calm pacing.',
+    tone: 'Expressive & Modern',
+    description: 'Trusted British male presenter voice with distinct pronunciation and calm pacing.',
     sampleText: 'Good day. Theo here. Your location is confirmed and ready to share with your caregiver.',
   },
   {
-    id: 'en-US-1',
-    name: 'US Neutral',
-    gender: 'female',
+    id: 'jack',
+    name: 'Jack',
+    gender: 'male',
     accent: 'American (US)',
     flag: '🇺🇸',
-    tone: 'Standard Clarity',
-    description: 'Standard neutral American English synthesis voice for general guidance.',
-    sampleText: 'Senior SafeSpot navigation active. Your current address has been confirmed.',
-  },
-  {
-    id: 'en-GB-1',
-    name: 'UK Neutral',
-    gender: 'female',
-    accent: 'British (UK)',
-    flag: '🇬🇧',
-    tone: 'Standard Clarity',
-    description: 'Standard neutral British English synthesis voice for general guidance.',
-    sampleText: 'Senior SafeSpot navigation active. Your current address has been confirmed.',
+    tone: 'Clear & Steady',
+    description: 'Clear, steady American male voice with natural intonation.',
+    sampleText: 'Hello, this is Jack. Your pickup coordinates are verified and ready to go.',
   },
 ];
 
@@ -171,7 +171,7 @@ export interface AccessibilitySettings {
   simplifiedMode: boolean;
   haptics: boolean;
   alwaysShowStreetView: boolean;
-  speechmaticsVoice: string; // 'sarah' | 'jack' | 'megan' | 'theo' | 'en-US-1' | 'en-GB-1'
+  speechmaticsVoice: string; // 'sarah' | 'megan' | 'theo' | 'jack'
   speechmaticsRate?: number; // 0.85 (elder-friendly) to 1.0
 }
 

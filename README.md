@@ -9,7 +9,7 @@ An elder-friendly Singapore live location and pickup assistant powered by **Gemi
 - **Gemini Multimodal Landmark Verification**: Cross-references user-taken photos and GPS coordinates with Google Street View and Google Places to identify distinctive visual landmarks (storefront signs, benches, shelters, building entrances).
 - **Speechmatics Realtime Voice Engine**:
   - **Speech-to-Text (STT)**: Real-time microphone audio streaming via `@speechmatics/real-time-client` with live partial and final transcriptions.
-  - **Text-to-Speech (TTS)**: Choice of voices (**Sarah** [UK Friendly], **Jack** [US Support], **Megan** [US Companion], **Theo** [UK Presenter], and Neutral accents) with elder-friendly cadence (0.85x).
+  - **Text-to-Speech (TTS)**: Authentic Speechmatics voices (**Sarah** [UK Female], **Megan** [US Female], **Theo** [UK Male], and **Jack** [US Male]) with elder-friendly cadence (0.85x).
 - **Driver Pickup Notes & Directions**: Formats concise, actionable pickup notes for drivers and caregivers with direct navigation links to Google Maps, Apple Maps, and Waze.
 - **Singapore Emergency SOS (SCDF 995)**: Dedicated, accessible emergency dial trigger with a 5-second cancelable reassurance countdown.
 - **Elderly High-Contrast Visual Modes**: Includes Yellow-on-Black (maximum contrast), High B&W, and Warm Amber display modes with dynamic text size scaling.
@@ -24,8 +24,8 @@ An elder-friendly Singapore live location and pickup assistant powered by **Gemi
 
 ### 2. Installation
 ```bash
-git clone https://github.com/Sedilix/Gemini-for-the-young-folks.git
-cd Gemini-for-the-young-folks
+git clone https://github.com/Sedilix/Build-w-Gemini-22-Aug.git
+cd Build-w-Gemini-22-Aug
 npm install
 ```
 

@@ -3,19 +3,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import 'dotenv/config';
 import express from 'express';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { GoogleGenAI, Type } from '@google/genai';
 import { createServer as createViteServer } from 'vite';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 9003;
 
 app.use(express.json({ limit: '35mb' }));
+
+// Helper: Clean text for Speechmatics TTS synthesis (strip markdown, asterisks, URLs, emoji)
+function cleanSpeakableText(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/https?:\/\/\S+/gi, '')
+    .replace(/[\*\_~`#>\[\]\(\)]/g, ' ')
+    .replace(/[\u{1F600}-\u{1F6FF}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1F018}-\u{1F270}\u{2388}-\u{27BF}]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 // Initialize Google GenAI lazily or securely
 function getGeminiClient(): GoogleGenAI | null {
@@ -91,7 +99,7 @@ app.post('/api/speechmatics/token', async (req, res) => {
     }
 
     const data = (await mpRes.json()) as any;
-    const token = data.key_value || data.key || data.token || data.jwt;
+    const token = data.key_value || data.key || data.token || data.jwt || '';
 
     return res.json({
       hasSpeechmaticsKey: true,
@@ -110,6 +118,8 @@ app.post('/api/speechmatics/token', async (req, res) => {
 });
 
 // Endpoint: Speechmatics Available Voices
+// NOTE: Speechmatics TTS preview currently supports exactly 4 voices.
+// See https://docs.speechmatics.com/text-to-speech/quickstart#voices
 app.get('/api/speechmatics/voices', (req, res) => {
   const voices = [
     {
@@ -118,20 +128,10 @@ app.get('/api/speechmatics/voices', (req, res) => {
       gender: 'female',
       accent: 'British (UK)',
       flag: '🇬🇧',
-      tone: 'Friendly & Warm',
-      description: 'Empathetic, clear, and reassuring tone. Highly recommended for elderly users and emergency assistance.',
+      tone: 'Crisp & Professional',
+      description: 'Clear, reassuring, and professional female voice. Highly recommended for elderly users and emergency navigation.',
       sampleText: 'Hello! I am Sarah. You are safe. I will help you verify your location and notify your family.',
       isRecommended: true,
-    },
-    {
-      id: 'jack',
-      name: 'Jack',
-      gender: 'male',
-      accent: 'American (US)',
-      flag: '🇺🇸',
-      tone: 'Deep & Clear',
-      description: 'Support specialist voice with steady, authoritative, and articulate pacing.',
-      sampleText: 'Hello, this is Jack. I have verified your GPS coordinates and pickup point on the map.',
     },
     {
       id: 'megan',
@@ -139,8 +139,8 @@ app.get('/api/speechmatics/voices', (req, res) => {
       gender: 'female',
       accent: 'American (US)',
       flag: '🇺🇸',
-      tone: 'Gentle & Natural',
-      description: 'Clear companion voice with gentle inflection and smooth conversational cadence.',
+      tone: 'Dynamic & Conversational',
+      description: 'Clear female companion voice with gentle inflection and smooth conversational cadence.',
       sampleText: 'Hi there, I am Megan. Please stay sheltered on the bench while your driver arrives.',
     },
     {
@@ -149,29 +149,19 @@ app.get('/api/speechmatics/voices', (req, res) => {
       gender: 'male',
       accent: 'British (UK)',
       flag: '🇬🇧',
-      tone: 'Calm & Trustworthy',
-      description: 'Trusted presenter voice with distinct British pronunciation and calm pacing.',
+      tone: 'Expressive & Modern',
+      description: 'Trusted British male presenter voice with distinct pronunciation and calm pacing.',
       sampleText: 'Good day. Theo here. Your location is confirmed and ready to share with your caregiver.',
     },
     {
-      id: 'en-US-1',
-      name: 'US Neutral',
-      gender: 'female',
+      id: 'jack',
+      name: 'Jack',
+      gender: 'male',
       accent: 'American (US)',
       flag: '🇺🇸',
-      tone: 'Standard Clarity',
-      description: 'Standard neutral American English synthesis voice for general guidance.',
-      sampleText: 'Senior SafeSpot navigation active. Your current address has been confirmed.',
-    },
-    {
-      id: 'en-GB-1',
-      name: 'UK Neutral',
-      gender: 'female',
-      accent: 'British (UK)',
-      flag: '🇬🇧',
-      tone: 'Standard Clarity',
-      description: 'Standard neutral British English synthesis voice for general guidance.',
-      sampleText: 'Senior SafeSpot navigation active. Your current address has been confirmed.',
+      tone: 'Clear & Steady',
+      description: 'Clear, steady American male voice with natural intonation.',
+      sampleText: 'Hello, this is Jack. Your pickup coordinates are verified and ready to go.',
     },
   ];
 
@@ -195,26 +185,43 @@ app.post('/api/speechmatics/tts', async (req, res) => {
     return res.status(400).json({ error: 'SPEECHMATICS_API_KEY is not configured.' });
   }
 
+  const cleanText = cleanSpeakableText(text);
+  if (!cleanText) {
+    return res.status(400).json({ error: 'No speakable text content after sanitization.' });
+  }
+
+  // Sanitize voice identifier
+  const safeVoice = (voice || 'sarah').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40) || 'sarah';
+
   try {
-    const ttsRes = await fetch('https://mp.speechmatics.com/v1/tts', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        text,
-        voice,
-        output_format: 'mp3',
-      }),
-    });
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 20000);
+
+    // Call Speechmatics preview TTS generation endpoint with safe voice actor
+    const ttsRes = await fetch(
+      `https://preview.tts.speechmatics.com/generate/${encodeURIComponent(safeVoice)}?output_format=wav_16000`,
+      {
+        method: 'POST',
+        signal: ctrl.signal,
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: cleanText,
+        }),
+      }
+    );
+
+    clearTimeout(timer);
 
     if (ttsRes.ok) {
       const audioBuffer = await ttsRes.arrayBuffer();
-      res.set('Content-Type', 'audio/mp3');
+      res.set('Content-Type', 'audio/wav');
       return res.send(Buffer.from(audioBuffer));
     } else {
       const errText = await ttsRes.text();
+      console.warn(`Speechmatics TTS returned ${ttsRes.status}:`, errText);
       return res.status(ttsRes.status).json({
         error: 'Speechmatics TTS error',
         details: errText,
