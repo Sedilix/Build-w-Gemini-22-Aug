@@ -960,6 +960,7 @@ function SeniorSafeSpotHome() {
         isOpen={isCaregiverPreviewOpen}
         onClose={() => setIsCaregiverPreviewOpen(false)}
         verification={verification}
+        photoBase64={currentPhoto}
         settings={settings}
       />
 

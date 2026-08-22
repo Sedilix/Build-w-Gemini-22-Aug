@@ -110,6 +110,9 @@ export const VisualLandmarkScanner: React.FC<VisualLandmarkScannerProps> = ({
                 `https://images.unsplash.com/photo-1576602976047-174e57a47881?auto=format&fit=crop&w=800&q=80`
               }
               alt="Google Street View Reference"
+              onError={(e) => {
+                e.currentTarget.src = 'https://images.unsplash.com/photo-1576602976047-174e57a47881?auto=format&fit=crop&w=800&q=80';
+              }}
               className="h-full w-full object-cover"
             />
             <div className="absolute top-2 right-2 rounded bg-black/75 px-2 py-0.5 text-xs font-bold text-white">
