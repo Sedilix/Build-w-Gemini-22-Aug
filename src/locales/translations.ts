@@ -270,10 +270,10 @@ export const TRANSLATIONS: Record<string, Partial<Record<Language, string>>> = {
 
   // ── One-Tap Share Panel ─────────────────────────────────────────────────
   'share.title': {
-    en: 'One-Tap Caregiver & Family Pickup',
-    zh: '一键通知看护与家人来接',
-    ms: 'Satu-Tap Penjaga & Keluarga',
-    ta: 'ஒரே தட்டலில் பராமரிப்பாளர் & குடும்பம்',
+    en: 'One-Tap Pickup',
+    zh: '一键接送',
+    ms: 'Satu-Tap Ambil',
+    ta: 'ஒரே தட்டலில் பிக்கப்',
   },
   'share.subtitle': {
     en: 'Tap any contact below to immediately send your exact verified location & photo',
