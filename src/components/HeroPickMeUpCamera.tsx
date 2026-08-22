@@ -18,8 +18,7 @@ import {
   Compass, 
   ChevronRight,
   SunMedium,
-  CheckCircle2,
-  Upload
+  CheckCircle2
 } from 'lucide-react';
 import { 
   GPSLocation, 
@@ -56,7 +55,6 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
   const [selectedPresetId, setSelectedPresetId] = useState<string>('toa-payoh-hub');
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const isYellow = settings.contrastTheme === 'yellow-black';
 
@@ -127,21 +125,6 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const base64 = event.target?.result as string;
-        if (base64) {
-          setCapturedPhoto(base64);
-          onPickMeUp(base64);
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   return (
     <section 
       id="hero-pick-me-up-section"
@@ -192,11 +175,21 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
               alt="Surroundings"
               className="w-full h-full object-cover"
             />
+          ) : cameraError ? (
+            <div className="text-center p-6 space-y-3 text-amber-200">
+              <AlertCircle className="w-14 h-14 mx-auto text-amber-400" />
+              <div className="font-bold text-base sm:text-lg text-white">
+                Camera Not Available
+              </div>
+              <p className="text-xs sm:text-sm text-slate-300 max-w-sm mx-auto">
+                {cameraError}
+              </p>
+            </div>
           ) : (
             <div className="text-center p-6 space-y-3 text-slate-300">
-              <Camera className="w-14 h-14 mx-auto text-slate-400 animate-bounce" />
+              <Camera className="w-14 h-14 mx-auto text-slate-400 animate-pulse" />
               <div className="font-bold text-base sm:text-lg text-white">
-                Live Camera Ready
+                Starting Camera...
               </div>
               <p className="text-xs sm:text-sm text-slate-400 max-w-sm mx-auto">
                 Point your phone at the building, shopfront, or street sign in front of you.
@@ -230,28 +223,12 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
             </div>
           )}
 
-          {/* Quick Fallback / Switcher Controls (Bottom of Viewfinder) */}
+          {/* Live/Preview Status Badge (Bottom of Viewfinder) */}
           <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between gap-2 pointer-events-auto">
             <div className="bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold text-white flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
               <span>{isLiveCameraActive ? 'Live Camera Feed' : 'Surroundings Preview'}</span>
             </div>
-
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="bg-black/70 hover:bg-black/90 text-white text-xs font-bold px-3 py-1.5 rounded-xl border border-white/20 flex items-center gap-1.5 transition-all"
-            >
-              <Upload className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Upload Photo</span>
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
           </div>
         </div>
 
@@ -333,6 +310,24 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
               <p className="text-xs sm:text-sm font-semibold">
                 <strong>Pickup Point: </strong>{verification.formattedAddress} ({verification.pickupInstructionsForDriver})
               </p>
+            )}
+
+            {/* BLE Micro-Location Beacon Triangulation */}
+            {verification.bleBeacons && verification.bleBeacons.length > 0 && (
+              <div className="pt-2 border-t border-slate-200/60 dark:border-neutral-700/60 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-1.5 font-bold text-sky-700 dark:text-sky-300">
+                  <span className="w-2.5 h-2.5 rounded-full bg-sky-500 animate-ping"></span>
+                  <span>📡 BLE Beacon: {verification.bleBeacons[0].locationName}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded-md font-mono font-bold bg-sky-100 dark:bg-sky-950 text-sky-800 dark:text-sky-200 border border-sky-300 dark:border-sky-800 text-[10px]">
+                    RSSI {verification.bleBeacons[0].rssi} dBm (±{verification.bleBeacons[0].estimatedDistanceMeters}m)
+                  </span>
+                  <span className="text-[10px] uppercase font-black text-emerald-600 dark:text-emerald-400">
+                    ⚡ Sub-3m Precision
+                  </span>
+                </div>
+              </div>
             )}
           </div>
         )}
