@@ -92,7 +92,7 @@ export interface BLEBeaconScan {
   estimatedDistanceMeters: number;
   locationName: string; // e.g. "Toa Payoh Hub Taxi Stand 1 - Beacon #04"
   floorLevel?: string; // e.g. "Level 1" or "Basement 1 Concourse"
-  zoneType: 'transit_hub' | 'hospital' | 'hdb_estate' | 'shopping_mall' | 'caregiver_tag' | 'unknown';
+  zoneType: 'transit_hub' | 'hospital' | 'hdb_estate' | 'shopping_mall' | 'caregiver_tag' | 'building_entrance' | 'community_zone' | 'unknown';
   lat?: number;
   lng?: number;
   batteryPercent?: number;

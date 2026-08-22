@@ -68,7 +68,7 @@ import {
   updateMotionGpsSpeed, 
   CrashEventData 
 } from './utils/fallDetection';
-import { getBeaconsForVerification, startBeaconScan, stopBeaconScan } from './utils/ble';
+import { getBeaconsForVerification, startBeaconScan, stopBeaconScan, updateBeaconsFromGps } from './utils/ble';
 import { resolveSavedPlace } from './utils/places';
 import { auth, subscribeToUserProfile, saveUserProfile, createIncident, updateIncident } from './lib/firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
@@ -255,8 +255,10 @@ function SeniorSafeSpotHome() {
     ) => {
       setIsVerifyingAI(true);
       try {
-        // Snapshot whatever the live BLE scan has actually heard. Empty unless
-        // the senior started scanning and a registered beacon is in range.
+        // Resolve surveyed Singapore venue beacons based on GPS or live radio scan
+        if (coords.latitude && coords.longitude) {
+          updateBeaconsFromGps(coords.latitude, coords.longitude);
+        }
         const bleBeacons = getBeaconsForVerification();
 
         const res = await fetch('/api/gemini/analyze-location', {

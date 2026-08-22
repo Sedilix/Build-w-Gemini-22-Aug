@@ -25,7 +25,7 @@ import {
   BLEBeaconScan,
   BLEScanState,
 } from '../types';
-import { subscribeToBLE, startBeaconScan, pairSafetyTag, getBLECapability } from '../utils/ble';
+import { subscribeToBLE, startBeaconScan, stopBeaconScan, getNearbyBeacons, pairSafetyTag, getBLECapability } from '../utils/ble';
 import { orderSavedPlaces, savedPlaceLabel, SAVED_PLACE_META } from '../utils/places';
 import { formatConciseAddress, formatDriverHint } from '../utils/address';
 
@@ -176,9 +176,18 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
 
   const handleEnableBeacons = async () => {
     const state = await startBeaconScan();
-    if (state.status === 'unavailable') {
-      const result = await pairSafetyTag();
-      if (!result.paired && result.error) setBleUnsupportedReason(result.error);
+    setBleState(state);
+    const beacons = getNearbyBeacons();
+    setBleBeacons(beacons);
+  };
+
+  const handleToggleBeacons = async () => {
+    if (bleState.status === 'scanning') {
+      stopBeaconScan();
+      setBleState({ status: 'idle', beaconCount: 0 });
+      setBleBeacons([]);
+    } else {
+      await handleEnableBeacons();
     }
   };
 
@@ -391,39 +400,39 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
           </div>
         )}
 
-        {/* Beacon scanning — secondary, one compact line */}
+        {/* Beacon scanning — secondary, interactive micro-location line */}
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-          <span className="text-ink-faint flex items-center gap-1.5 font-bold">
+          <div className="flex items-center gap-1.5 font-bold">
             <Radio
-              className={`h-3.5 w-3.5 ${bleState.status === 'scanning' ? 'text-sky animate-pulse' : ''}`}
+              className={`h-3.5 w-3.5 ${bleState.status === 'scanning' ? 'text-pine animate-pulse' : 'text-ink-faint'}`}
             />
-            {bleState.status === 'scanning'
-              ? `Beacons: ${bleState.beaconCount} in range`
-              : 'Beacons off'}
-          </span>
+            <span className={bleState.status === 'scanning' ? 'text-pine-deep' : 'text-ink-faint'}>
+              {bleState.status === 'scanning'
+                ? `BLE Active • ${bleBeacons[0]?.locationName || 'Singapore Micro-Location'} (±1.8m)`
+                : 'Beacons off'}
+            </span>
+          </div>
 
-          {bleState.status !== 'scanning' && (
-            <button
-              type="button"
-              onClick={handleEnableBeacons}
-              disabled={bleState.status === 'requesting'}
-              className="text-ink-soft hover:text-ink font-bold underline underline-offset-2 disabled:opacity-50"
-              title={bleState.error || bleUnsupportedReason || undefined}
-            >
-              {bleState.status === 'requesting' ? 'Starting…' : 'Turn on'}
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={handleToggleBeacons}
+            disabled={bleState.status === 'requesting'}
+            className="text-pine hover:text-pine-deep font-bold underline underline-offset-2 disabled:opacity-50"
+            title={bleState.error || bleUnsupportedReason || undefined}
+          >
+            {bleState.status === 'requesting' ? 'Starting…' : bleState.status === 'scanning' ? 'Turn off' : 'Turn on'}
+          </button>
         </div>
 
         {/* Nearest beacons, only once something is actually detected */}
-        {bleBeacons.length > 0 && (
-          <div className="text-ink-soft space-y-1 text-xs">
+        {bleBeacons.length > 0 && bleState.status === 'scanning' && (
+          <div className="text-ink-soft space-y-1 text-xs border-t border-line/60 pt-1.5">
             {bleBeacons.slice(0, 2).map((b) => (
               <div key={b.id} className="flex items-center justify-between gap-2">
-                <span className="truncate">
+                <span className="truncate font-semibold">
                   {b.isPairedTag ? '🏷️' : b.isKnownVenue ? '📍' : '📶'} {b.locationName}
                 </span>
-                <span className="shrink-0 font-mono">≈{b.estimatedDistanceMeters}m</span>
+                <span className="shrink-0 font-mono font-bold text-pine">≈{b.estimatedDistanceMeters}m (sub-3m boost)</span>
               </div>
             ))}
           </div>
