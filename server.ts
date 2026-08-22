@@ -499,6 +499,517 @@ async function computeDriverRoute(
   return null;
 }
 
+// ============================================================================
+// Singapore Curated Medical, Work & Landmark Registry
+// ============================================================================
+interface SingaporePresetPlace {
+  title: string;
+  subtitle: string;
+  fullAddress: string;
+  postalCode: string;
+  lat: number;
+  lng: number;
+  category: 'healthcare' | 'work' | 'home' | 'general';
+  tags: string[];
+  providerType?: 'public' | 'private';
+}
+
+const SINGAPORE_PRESET_PLACES: SingaporePresetPlace[] = [
+  // Public Hospitals
+  {
+    title: 'Singapore General Hospital (SGH)',
+    subtitle: 'Outram Rd • Public Tertiary Hospital',
+    fullAddress: 'Outram Rd, Singapore 169608',
+    postalCode: '169608',
+    lat: 1.2792,
+    lng: 103.8344,
+    category: 'healthcare',
+    providerType: 'public',
+    tags: ['sgh', 'outram', 'singapore general hospital', 'public hospital', 'emergency'],
+  },
+  {
+    title: 'Tan Tock Seng Hospital (TTSH)',
+    subtitle: '11 Jalan Tan Tock Seng • Novena HealthCity',
+    fullAddress: '11 Jalan Tan Tock Seng, Singapore 308433',
+    postalCode: '308433',
+    lat: 1.3214,
+    lng: 103.8458,
+    category: 'healthcare',
+    providerType: 'public',
+    tags: ['ttsh', 'tan tock seng', 'novena', 'public hospital', 'emergency'],
+  },
+  {
+    title: 'National University Hospital (NUH)',
+    subtitle: '5 Lower Kent Ridge Rd • Kent Ridge',
+    fullAddress: '5 Lower Kent Ridge Rd, Singapore 119074',
+    postalCode: '119074',
+    lat: 1.2936,
+    lng: 103.7831,
+    category: 'healthcare',
+    providerType: 'public',
+    tags: ['nuh', 'national university hospital', 'kent ridge', 'public hospital', 'emergency'],
+  },
+  {
+    title: 'Changi General Hospital (CGH)',
+    subtitle: '2 Simei Street 3 • Simei',
+    fullAddress: '2 Simei Street 3, Singapore 529889',
+    postalCode: '529889',
+    lat: 1.3404,
+    lng: 103.9495,
+    category: 'healthcare',
+    providerType: 'public',
+    tags: ['cgh', 'changi general hospital', 'simei', 'tampines', 'public hospital', 'emergency'],
+  },
+  {
+    title: 'Khoo Teck Puat Hospital (KTPH)',
+    subtitle: '90 Yishun Central • Yishun',
+    fullAddress: '90 Yishun Central, Singapore 768828',
+    postalCode: '768828',
+    lat: 1.4246,
+    lng: 103.8382,
+    category: 'healthcare',
+    providerType: 'public',
+    tags: ['ktph', 'khoo teck puat', 'yishun', 'public hospital', 'emergency'],
+  },
+  {
+    title: 'Sengkang General Hospital (SKH)',
+    subtitle: '110 Sengkang East Way • Sengkang',
+    fullAddress: '110 Sengkang East Way, Singapore 544886',
+    postalCode: '544886',
+    lat: 1.3954,
+    lng: 103.8931,
+    category: 'healthcare',
+    providerType: 'public',
+    tags: ['skh', 'sengkang general hospital', 'sengkang', 'punggol', 'public hospital', 'emergency'],
+  },
+  {
+    title: 'Ng Teng Fong General Hospital (NTFGH)',
+    subtitle: '1 Jurong East Street 21 • Jurong East',
+    fullAddress: '1 Jurong East Street 21, Singapore 609606',
+    postalCode: '609606',
+    lat: 1.3333,
+    lng: 103.746,
+    category: 'healthcare',
+    providerType: 'public',
+    tags: ['ntfgh', 'ng teng fong', 'jurong east', 'jurong', 'public hospital', 'emergency'],
+  },
+  {
+    title: "KK Women's and Children's Hospital (KKH)",
+    subtitle: '100 Bukit Timah Rd • Rochor',
+    fullAddress: '100 Bukit Timah Rd, Singapore 229899',
+    postalCode: '229899',
+    lat: 1.3106,
+    lng: 103.8475,
+    category: 'healthcare',
+    providerType: 'public',
+    tags: ['kkh', 'kk hospital', 'bukit timah', 'rochor', 'public hospital'],
+  },
+  {
+    title: 'Woodlands Health Campus (WHC)',
+    subtitle: '2 Woodlands Drive 17 • Woodlands',
+    fullAddress: '2 Woodlands Drive 17, Singapore 737628',
+    postalCode: '737628',
+    lat: 1.4332,
+    lng: 103.7895,
+    category: 'healthcare',
+    providerType: 'public',
+    tags: ['whc', 'woodlands health', 'woodlands', 'public hospital', 'emergency'],
+  },
+
+  // Private Hospitals
+  {
+    title: 'Mount Elizabeth Hospital (Orchard)',
+    subtitle: '3 Mount Elizabeth • Orchard',
+    fullAddress: '3 Mount Elizabeth, Singapore 228510',
+    postalCode: '228510',
+    lat: 1.3048,
+    lng: 103.8354,
+    category: 'healthcare',
+    providerType: 'private',
+    tags: ['mount elizabeth', 'mount e orchard', 'orchard', 'private hospital'],
+  },
+  {
+    title: 'Mount Elizabeth Novena Hospital',
+    subtitle: '38 Irrawaddy Rd • Novena',
+    fullAddress: '38 Irrawaddy Rd, Singapore 329563',
+    postalCode: '329563',
+    lat: 1.3217,
+    lng: 103.8441,
+    category: 'healthcare',
+    providerType: 'private',
+    tags: ['mount elizabeth novena', 'novena', 'private hospital'],
+  },
+  {
+    title: 'Gleneagles Hospital',
+    subtitle: '6A Napier Rd • Tanglin',
+    fullAddress: '6A Napier Rd, Singapore 258500',
+    postalCode: '258500',
+    lat: 1.3075,
+    lng: 103.8188,
+    category: 'healthcare',
+    providerType: 'private',
+    tags: ['gleneagles', 'napier', 'tanglin', 'private hospital'],
+  },
+  {
+    title: 'Mount Alvernia Hospital',
+    subtitle: '820 Thomson Rd • Marymount',
+    fullAddress: '820 Thomson Rd, Singapore 298145',
+    postalCode: '298145',
+    lat: 1.3417,
+    lng: 103.8398,
+    category: 'healthcare',
+    providerType: 'private',
+    tags: ['mount alvernia', 'thomson', 'marymount', 'private hospital'],
+  },
+  {
+    title: 'Raffles Hospital',
+    subtitle: '585 North Bridge Rd • Bugis',
+    fullAddress: '585 North Bridge Rd, Singapore 188770',
+    postalCode: '188770',
+    lat: 1.3005,
+    lng: 103.8576,
+    category: 'healthcare',
+    providerType: 'private',
+    tags: ['raffles hospital', 'bugis', 'north bridge road', 'private hospital'],
+  },
+  {
+    title: 'Parkway East Hospital',
+    subtitle: '321 Joo Chiat Pl • East Coast',
+    fullAddress: '321 Joo Chiat Pl, Singapore 427990',
+    postalCode: '427990',
+    lat: 1.3146,
+    lng: 103.9079,
+    category: 'healthcare',
+    providerType: 'private',
+    tags: ['parkway east', 'joo chiat', 'katong', 'private hospital'],
+  },
+  {
+    title: 'Thomson Medical Centre',
+    subtitle: '339 Thomson Rd • Novena / Thomson',
+    fullAddress: '339 Thomson Rd, Singapore 307677',
+    postalCode: '307677',
+    lat: 1.3256,
+    lng: 103.8407,
+    category: 'healthcare',
+    providerType: 'private',
+    tags: ['thomson medical', 'thomson', 'private hospital'],
+  },
+
+  // Key Polyclinics (SingHealth, NHG, NUHS)
+  {
+    title: 'Toa Payoh Polyclinic',
+    subtitle: '2003 Lor 8 Toa Payoh • NHG Polyclinic',
+    fullAddress: '2003 Lor 8 Toa Payoh, Singapore 319260',
+    postalCode: '319260',
+    lat: 1.3392,
+    lng: 103.8577,
+    category: 'healthcare',
+    providerType: 'public',
+    tags: ['toa payoh polyclinic', 'polyclinic', 'nhg', 'toa payoh'],
+  },
+  {
+    title: 'Yishun Polyclinic',
+    subtitle: '1000 Yishun Ave 5 • NHG Polyclinic',
+    fullAddress: '1000 Yishun Ave 5, Singapore 768794',
+    postalCode: '768794',
+    lat: 1.4312,
+    lng: 103.8322,
+    category: 'healthcare',
+    providerType: 'public',
+    tags: ['yishun polyclinic', 'polyclinic', 'nhg', 'yishun'],
+  },
+  {
+    title: 'Bedok Polyclinic (Heartbeat@Bedok)',
+    subtitle: '11 Bedok North Street 1 • SingHealth Polyclinic',
+    fullAddress: '11 Bedok North Street 1, #02-01 Heartbeat@Bedok, Singapore 469662',
+    postalCode: '469662',
+    lat: 1.3267,
+    lng: 103.9317,
+    category: 'healthcare',
+    providerType: 'public',
+    tags: ['bedok polyclinic', 'heartbeat bedok', 'polyclinic', 'singhealth', 'bedok'],
+  },
+  {
+    title: 'Tampines Polyclinic (Our Tampines Hub)',
+    subtitle: '1 Tampines Walk • SingHealth Polyclinic',
+    fullAddress: '1 Tampines Walk, #03-31 Our Tampines Hub, Singapore 528523',
+    postalCode: '528523',
+    lat: 1.3533,
+    lng: 103.9405,
+    category: 'healthcare',
+    providerType: 'public',
+    tags: ['tampines polyclinic', 'our tampines hub', 'polyclinic', 'singhealth', 'tampines'],
+  },
+  {
+    title: 'Jurong Polyclinic',
+    subtitle: '190 Jurong East Ave 1 • NUP Polyclinic',
+    fullAddress: '190 Jurong East Ave 1, Singapore 609788',
+    postalCode: '609788',
+    lat: 1.3499,
+    lng: 103.7388,
+    category: 'healthcare',
+    providerType: 'public',
+    tags: ['jurong polyclinic', 'polyclinic', 'nuhs', 'nup', 'jurong east'],
+  },
+  {
+    title: 'Outram Polyclinic',
+    subtitle: '3 Second Hospital Ave • SingHealth Polyclinic',
+    fullAddress: '3 Second Hospital Ave, #02-00 Health Promotion Board Building, Singapore 168937',
+    postalCode: '168937',
+    lat: 1.2801,
+    lng: 103.8378,
+    category: 'healthcare',
+    providerType: 'public',
+    tags: ['outram polyclinic', 'polyclinic', 'singhealth', 'outram', 'chinatown'],
+  },
+  {
+    title: 'Ang Mo Kio Polyclinic',
+    subtitle: '21 Ang Mo Kio Central 2 • NHG Polyclinic',
+    fullAddress: '21 Ang Mo Kio Central 2, Singapore 569666',
+    postalCode: '569666',
+    lat: 1.3697,
+    lng: 103.8475,
+    category: 'healthcare',
+    providerType: 'public',
+    tags: ['ang mo kio polyclinic', 'polyclinic', 'amk', 'nhg'],
+  },
+
+  // Popular Work & Business Hubs
+  {
+    title: 'BLOCK71 Singapore',
+    subtitle: '71 Ayer Rajah Crescent • LaunchPad @ one-north',
+    fullAddress: '71 Ayer Rajah Crescent, Singapore 139951',
+    postalCode: '139951',
+    lat: 1.2968,
+    lng: 103.7865,
+    category: 'work',
+    tags: ['block71', 'blk71', 'ayer rajah', 'launchpad', 'one-north', 'startup', 'work'],
+  },
+  {
+    title: 'LaunchPad @ one-north',
+    subtitle: 'Ayer Rajah Crescent • Tech & Innovation Park',
+    fullAddress: 'LaunchPad @ one-north, Singapore 139951',
+    postalCode: '139951',
+    lat: 1.2965,
+    lng: 103.7862,
+    category: 'work',
+    tags: ['launchpad', 'one north', 'ayer rajah', 'work'],
+  },
+  {
+    title: 'Fusionopolis One',
+    subtitle: '1 Fusionopolis Way • one-north Hub',
+    fullAddress: '1 Fusionopolis Way, Singapore 138632',
+    postalCode: '138632',
+    lat: 1.2994,
+    lng: 103.7885,
+    category: 'work',
+    tags: ['fusionopolis', 'one-north', 'a*star', 'work'],
+  },
+  {
+    title: 'Marina Bay Financial Centre (MBFC)',
+    subtitle: '10 Marina Blvd • Central Business District',
+    fullAddress: '10 Marina Blvd, Singapore 018983',
+    postalCode: '018983',
+    lat: 1.2798,
+    lng: 103.8542,
+    category: 'work',
+    tags: ['mbfc', 'marina bay financial centre', 'cbd', 'downtown', 'work'],
+  },
+  {
+    title: 'Suntec City Tower',
+    subtitle: '7 Temasek Blvd • Marina Centre',
+    fullAddress: '7 Temasek Blvd, Singapore 038987',
+    postalCode: '038987',
+    lat: 1.2935,
+    lng: 103.8572,
+    category: 'work',
+    tags: ['suntec', 'suntec city', 'temasek', 'work'],
+  },
+  {
+    title: 'Guoco Tower',
+    subtitle: '1 Wallich St • Tanjong Pagar',
+    fullAddress: '1 Wallich St, Singapore 078881',
+    postalCode: '078881',
+    lat: 1.277,
+    lng: 103.8458,
+    category: 'work',
+    tags: ['guoco tower', 'tanjong pagar', 'cbd', 'work'],
+  },
+  {
+    title: 'Our Tampines Hub (OTH)',
+    subtitle: '1 Tampines Walk • Community & Lifestyle Hub',
+    fullAddress: '1 Tampines Walk, Singapore 528523',
+    postalCode: '528523',
+    lat: 1.3533,
+    lng: 103.9405,
+    category: 'general',
+    tags: ['our tampines hub', 'oth', 'tampines', 'hub'],
+  },
+  {
+    title: 'Toa Payoh HDB Hub',
+    subtitle: '480 Lor 6 Toa Payoh • Central Hub',
+    fullAddress: '480 Lor 6 Toa Payoh, Singapore 310480',
+    postalCode: '310480',
+    lat: 1.3328,
+    lng: 103.8488,
+    category: 'general',
+    tags: ['hdb hub', 'toa payoh hub', 'toa payoh'],
+  },
+];
+
+// Endpoint: Singapore OneMap Geocoding & Address Search Proxy
+app.get('/api/onemap/search', async (req, res) => {
+  const query = String(req.query.q || req.query.searchVal || '').trim();
+  if (!query) {
+    return res.json({ found: 0, totalNumPages: 0, pageNum: 1, results: [] });
+  }
+
+  try {
+    const onemapUrl = `https://www.onemap.gov.sg/api/common/elastic/search?searchVal=${encodeURIComponent(query)}&returnGeom=Y&getAddrDetails=Y&pageNum=1`;
+    const r = await fetch(onemapUrl, {
+      headers: {
+        'User-Agent': 'SafeSpot-SG/1.0',
+      },
+    });
+
+    if (!r.ok) {
+      return res.json({ found: 0, totalNumPages: 0, pageNum: 1, results: [] });
+    }
+
+    const data = await r.json();
+    return res.json(data);
+  } catch (err: any) {
+    console.warn('OneMap search proxy failed:', err.message);
+    return res.json({ found: 0, totalNumPages: 0, pageNum: 1, results: [] });
+  }
+});
+
+// Endpoint: Multi-Engine Intelligent Address Autocomplete (Google Maps + OneMap + Preset Landmarks)
+app.get('/api/places/autocomplete', async (req, res) => {
+  const query = String(req.query.q || req.query.input || '').trim();
+  const category = String(req.query.category || 'general').toLowerCase(); // 'home' | 'work' | 'healthcare' | 'general'
+  const mapsKey = getGoogleMapsApiKey();
+
+  const results: Array<{
+    id: string;
+    title: string;
+    subtitle?: string;
+    fullAddress: string;
+    postalCode?: string;
+    lat?: number;
+    lng?: number;
+    source: 'google' | 'onemap' | 'singapore_landmark';
+    category?: string;
+    providerType?: 'public' | 'private';
+  }> = [];
+
+  const seenAddresses = new Set<string>();
+
+  const addSuggestion = (item: typeof results[0]) => {
+    const key = (item.fullAddress || item.title).toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (!seenAddresses.has(key)) {
+      seenAddresses.add(key);
+      results.push(item);
+    }
+  };
+
+  const normalizedQuery = query.toLowerCase();
+
+  // 1. Check curated Singapore Landmarks & Hospitals
+  const matchedPresets = SINGAPORE_PRESET_PLACES.filter((p) => {
+    if (!query) {
+      return category === 'healthcare' ? p.category === 'healthcare' : category === 'work' ? p.category === 'work' : true;
+    }
+    const matchTag = p.tags.some((t) => t.includes(normalizedQuery) || normalizedQuery.includes(t));
+    const matchTitle = p.title.toLowerCase().includes(normalizedQuery);
+    const matchAddress = p.fullAddress.toLowerCase().includes(normalizedQuery);
+    const matchPostal = p.postalCode.includes(normalizedQuery);
+    return matchTag || matchTitle || matchAddress || matchPostal;
+  });
+
+  for (const preset of matchedPresets.slice(0, 5)) {
+    addSuggestion({
+      id: `preset-${preset.postalCode}-${preset.title}`,
+      title: preset.title,
+      subtitle: preset.subtitle,
+      fullAddress: preset.fullAddress,
+      postalCode: preset.postalCode,
+      lat: preset.lat,
+      lng: preset.lng,
+      source: 'singapore_landmark',
+      category: preset.category,
+      providerType: preset.providerType,
+    });
+  }
+
+  // 2. Google Places Autocomplete API (if API Key is configured)
+  if (query.length >= 2 && mapsKey) {
+    try {
+      const gUrl = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&components=country:sg&language=en&key=${mapsKey}`;
+      const gRes = await fetch(gUrl);
+      if (gRes.ok) {
+        const gData = (await gRes.json()) as any;
+        if (gData.predictions && Array.isArray(gData.predictions)) {
+          for (const pred of gData.predictions.slice(0, 5)) {
+            const mainText = pred.structured_formatting?.main_text || pred.description;
+            const secondaryText = pred.structured_formatting?.secondary_text || 'Singapore';
+            addSuggestion({
+              id: `google-${pred.place_id}`,
+              title: mainText,
+              subtitle: secondaryText,
+              fullAddress: pred.description,
+              source: 'google',
+              category,
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Google Places autocomplete query error:', e);
+    }
+  }
+
+  // 3. Singapore OneMap Elastic Search API (Understands HDB Blocks, Road Names, Postal Codes)
+  if (query.length >= 2) {
+    try {
+      const onemapUrl = `https://www.onemap.gov.sg/api/common/elastic/search?searchVal=${encodeURIComponent(query)}&returnGeom=Y&getAddrDetails=Y&pageNum=1`;
+      const oRes = await fetch(onemapUrl, {
+        headers: { 'User-Agent': 'SafeSpot-SG/1.0' },
+      });
+      if (oRes.ok) {
+        const oData = (await oRes.json()) as any;
+        if (oData.results && Array.isArray(oData.results)) {
+          for (const r of oData.results.slice(0, 6)) {
+            const building = r.BUILDING && r.BUILDING !== 'NIL' ? r.BUILDING : null;
+            const blk = r.BLK_NO && r.BLK_NO !== 'NIL' ? `Blk ${r.BLK_NO} ` : '';
+            const road = r.ROAD_NAME && r.ROAD_NAME !== 'NIL' ? r.ROAD_NAME : '';
+            const postal = r.POSTAL && r.POSTAL !== 'NIL' ? r.POSTAL : '';
+
+            const title = building || (blk || road ? `${blk}${road}`.trim() : r.ADDRESS);
+            const subtitle = postal ? `Singapore ${postal}` : road || 'Singapore';
+
+            addSuggestion({
+              id: `onemap-${postal || ''}-${r.X || ''}-${r.Y || ''}`,
+              title,
+              subtitle,
+              fullAddress: r.ADDRESS || `${title}, Singapore ${postal}`.trim(),
+              postalCode: postal || undefined,
+              lat: Number(r.LATITUDE) || undefined,
+              lng: Number(r.LONGITUDE) || undefined,
+              source: 'onemap',
+              category,
+            });
+          }
+        }
+      }
+    } catch (err: any) {
+      console.warn('OneMap autocomplete query error:', err.message);
+    }
+  }
+
+  return res.json({ suggestions: results.slice(0, 8) });
+});
+
 // API endpoint: Multimodal Location Verification & Landmark Cross-Referencing
 app.post('/api/gemini/analyze-location', async (req, res) => {
   try {

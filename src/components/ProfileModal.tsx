@@ -21,6 +21,7 @@ import {
   FileText
 } from 'lucide-react';
 import { UserProfile, BloodType, EmergencyContact, AccessibilitySettings } from '../types';
+import { AddressAutocompleteInput } from './AddressAutocompleteInput';
 import { saveUserProfile, signOutUser } from '../lib/firebase';
 import { User as FirebaseUser } from 'firebase/auth';
 
@@ -429,20 +430,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
           {/* Section 4: Home Address */}
           <div>
-            <label className="label" htmlFor="profile-address">Permanent Home Address (Singapore)</label>
-            <div className="relative">
-              <div className="text-pine pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                <MapPin className="h-5 w-5" />
-              </div>
-              <input
-                id="profile-address"
-                type="text"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="e.g. Blk 480 Lorong 6 Toa Payoh #10-123, Singapore 310480"
-                className="input pl-10"
-              />
-            </div>
+            <AddressAutocompleteInput
+              id="profile-address"
+              value={address}
+              category="home"
+              label="Permanent Home Address (Singapore)"
+              placeholder="e.g. Blk 480 Lorong 6 Toa Payoh #10-123 or S310480"
+              onChange={(addr) => setAddress(addr)}
+            />
           </div>
 
           {/* Section 5: Emergency Contacts Preview & Link */}

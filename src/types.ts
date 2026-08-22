@@ -155,6 +155,18 @@ export interface SavedPlace {
   lng?: number;
 }
 
+export interface AddressSuggestion {
+  id?: string;
+  title: string;
+  subtitle?: string;
+  fullAddress: string;
+  postalCode?: string;
+  lat?: number;
+  lng?: number;
+  source: 'google' | 'onemap' | 'singapore_landmark';
+  category?: 'home' | 'work' | 'healthcare' | 'general';
+}
+
 export interface UserProfile {
   uid: string;
   actualName: string;

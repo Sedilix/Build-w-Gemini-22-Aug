@@ -23,6 +23,7 @@ import {
   SavedPlaceKind,
 } from '../types';
 import { AppLogo } from './AppLogo';
+import { AddressAutocompleteInput } from './AddressAutocompleteInput';
 import { EMERGENCY_995_CONTACT, ensureEmergency995 } from '../data/defaultContacts';
 import { importContactsFromPhone, isContactPickerSupported, createManualContact } from '../utils/contacts';
 import { SAVED_PLACE_KINDS, SAVED_PLACE_META } from '../utils/places';
@@ -342,21 +343,80 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               </p>
             </div>
 
-            {SAVED_PLACE_KINDS.map((kind) => (
-              <div key={kind}>
-                <label className="label" htmlFor={`onboard-place-${kind}`}>
-                  <span aria-hidden="true">{SAVED_PLACE_META[kind].emoji}</span>{' '}
-                  {SAVED_PLACE_META[kind].title}
-                </label>
-                <input
-                  id={`onboard-place-${kind}`}
-                  className="input"
-                  value={places[kind]}
-                  onChange={(e) => setPlaces((prev) => ({ ...prev, [kind]: e.target.value }))}
-                  placeholder={SAVED_PLACE_META[kind].hint}
-                />
-              </div>
-            ))}
+            <div className="space-y-4">
+              {SAVED_PLACE_KINDS.map((kind) => (
+                <div key={kind} className="space-y-1.5">
+                  <AddressAutocompleteInput
+                    id={`onboard-place-${kind}`}
+                    value={places[kind]}
+                    category={kind}
+                    label={SAVED_PLACE_META[kind].title}
+                    emoji={SAVED_PLACE_META[kind].emoji}
+                    placeholder={
+                      kind === 'home'
+                        ? 'e.g. 356 Yishun Ring Rd or S760356'
+                        : kind === 'work'
+                        ? 'e.g. BLOCK71, 71 Ayer Rajah Crescent'
+                        : 'e.g. Tan Tock Seng Hospital or Yishun Polyclinic'
+                    }
+                    onChange={(addr, suggestion) => {
+                      setPlaces((prev) => ({ ...prev, [kind]: addr }));
+                      if (kind === 'healthcare' && suggestion?.providerType) {
+                        setProviderType(suggestion.providerType);
+                      }
+                    }}
+                  />
+
+                  {/* Quick-pick recommendations for Healthcare */}
+                  {kind === 'healthcare' && !places.healthcare && (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      <span className="text-xs text-ink-faint font-semibold self-center mr-1">Popular:</span>
+                      {[
+                        { name: 'SGH', full: 'Outram Rd, Singapore 169608', type: 'public' },
+                        { name: 'TTSH', full: '11 Jalan Tan Tock Seng, Singapore 308433', type: 'public' },
+                        { name: 'NUH', full: '5 Lower Kent Ridge Rd, Singapore 119074', type: 'public' },
+                        { name: 'KTPH', full: '90 Yishun Central, Singapore 768828', type: 'public' },
+                        { name: 'Mt Elizabeth', full: '3 Mount Elizabeth, Singapore 228510', type: 'private' },
+                      ].map((item) => (
+                        <button
+                          key={item.name}
+                          type="button"
+                          onClick={() => {
+                            setPlaces((prev) => ({ ...prev, healthcare: item.full }));
+                            setProviderType(item.type as 'public' | 'private');
+                          }}
+                          className="chip bg-well hover:bg-pine-soft hover:text-pine text-ink text-xs font-semibold py-1 px-2.5 transition-colors"
+                        >
+                          🏥 {item.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Quick-pick recommendations for Work */}
+                  {kind === 'work' && !places.work && (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      <span className="text-xs text-ink-faint font-semibold self-center mr-1">Popular:</span>
+                      {[
+                        { name: 'BLOCK71', full: '71 Ayer Rajah Crescent, Singapore 139951' },
+                        { name: 'LaunchPad', full: 'LaunchPad @ one-north, Singapore 139951' },
+                        { name: 'MBFC', full: '10 Marina Blvd, Singapore 018983' },
+                        { name: 'Suntec City', full: '7 Temasek Blvd, Singapore 038987' },
+                      ].map((item) => (
+                        <button
+                          key={item.name}
+                          type="button"
+                          onClick={() => setPlaces((prev) => ({ ...prev, work: item.full }))}
+                          className="chip bg-well hover:bg-sky-50 hover:text-sky-700 text-ink text-xs font-semibold py-1 px-2.5 transition-colors"
+                        >
+                          💼 {item.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
 
             <div>
               <span className="label">Preferred healthcare provider type</span>
