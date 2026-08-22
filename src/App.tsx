@@ -59,6 +59,7 @@ import { speakSpeechmaticsOrFallback, stopSpeaking } from './utils/speech';
 import { getBatteryStatus, watchBattery } from './utils/telemetry';
 import { 
   ensureMotionPermission, 
+  motionPermissionNeedsGesture,
   startCrashAndFallDetection, 
   playEmergencyAlarmSiren, 
   stopEmergencyAlarmSiren, 
@@ -550,7 +551,7 @@ function SeniorSafeSpotHome() {
     let handle: { stop: () => void } | null = null;
     let cancelled = false;
 
-    ensureMotionPermission().then((granted) => {
+    const beginDetection = (granted: boolean) => {
       if (cancelled || !granted) return;
       handle = startCrashAndFallDetection((event) => {
         if (event.type === 'crash' && settings.crashDetection === false) return;
@@ -573,10 +574,26 @@ function SeniorSafeSpotHome() {
           );
         }
       });
-    });
+    };
+
+    // iOS only opens the motion permission prompt from inside a user gesture.
+    // Asking at mount is rejected silently and leaves the sensors permanently
+    // inactive, so there wait for the senior's first tap and ask from that.
+    let armFromGesture: (() => void) | null = null;
+
+    if (motionPermissionNeedsGesture()) {
+      armFromGesture = () => {
+        window.removeEventListener('pointerdown', armFromGesture!);
+        void ensureMotionPermission().then(beginDetection);
+      };
+      window.addEventListener('pointerdown', armFromGesture, { once: true });
+    } else {
+      void ensureMotionPermission().then(beginDetection);
+    }
 
     return () => {
       cancelled = true;
+      if (armFromGesture) window.removeEventListener('pointerdown', armFromGesture);
       handle?.stop();
     };
   }, [settings.fallDetection, settings.crashDetection, settings.spokenGuidance, settings.speechmaticsVoice, lang]);

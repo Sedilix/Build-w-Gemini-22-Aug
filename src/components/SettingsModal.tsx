@@ -288,32 +288,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               </div>
 
-              {/* Fall Detection Sensor Toggle (P1 passive safety) */}
-              <div className="border-line bg-well/60 flex items-center justify-between gap-3 rounded-xl border p-4">
-                <div>
-                  <div className="text-base font-bold sm:text-lg">Fall Detection Sensor</div>
-                  <div className="text-ink-soft text-sm">
-                    Uses the phone accelerometer to detect hard falls. Starts a 10-second
-                    cancelable countdown, then auto-calls 995 if not dismissed.
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={Boolean(settings.fallDetection)}
-                  onClick={() => onUpdateSettings((prev) => ({ ...prev, fallDetection: !prev.fallDetection }))}
-                  className={`relative inline-flex h-8 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-pine ${
-                    settings.fallDetection ? 'bg-pine' : 'bg-line-strong'
-                  }`}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow-lg transition duration-200 ease-in-out ${
-                      settings.fallDetection ? 'translate-x-6' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-              </div>
             </div>
           </section>
 
