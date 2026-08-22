@@ -509,6 +509,7 @@ app.post('/api/gemini/analyze-location', async (req, res) => {
       voiceNotes = '',
       manualClues = '',
       contextPreset,
+      bleBeacons = [],
     } = req.body;
 
     if (!gps || typeof gps.latitude !== 'number' || typeof gps.longitude !== 'number') {
@@ -573,6 +574,10 @@ app.post('/api/gemini/analyze-location', async (req, res) => {
                 confidence: 88,
               },
             ],
+        isIndoors: accuracy > 40,
+        environmentType: accuracy > 40 ? 'sheltered_porch' : 'outdoor_roadside',
+        indoorContext: accuracy > 40 ? 'Under sheltered walkway or building perimeter' : 'Outdoor street curbside',
+        indoorExitGuidance: accuracy > 40 ? 'Please step out towards the main driveway or taxi bay for driver pickup.' : 'Wait safely on the curbside pavement.',
         pickupInstructionsForDriver: `Pickup at ${approximateAddress || 'curbside'}. Driver should pull up directly near ${primaryLandmark}.`,
         elderlyVoiceSummary: `Your location is verified at ${approximateAddress ? approximateAddress.split(',')[0] : 'your pickup spot'}. You can safely share it now.`,
         safeWaitingAdvice: 'Please remain at the sheltered sidewalk or bench in clear sight of arriving vehicles.',
@@ -609,27 +614,35 @@ app.post('/api/gemini/analyze-location', async (req, res) => {
       ? `Roads API Snap-to-Road: Raw GPS was snapped to nearest drivable roadway at lat ${snappedRoad.lat}, lng ${snappedRoad.lng} (Place ID: ${snappedRoad.placeId || 'N/A'})`
       : 'Roads API: Using raw GPS centroid.';
 
+    const bleContext = (bleBeacons && bleBeacons.length > 0)
+      ? `BLE Micro-Location Beacons in Range: ${bleBeacons.map((b: any) => `${b.name} (${b.locationName}, RSSI: ${b.rssi} dBm, ~${b.estimatedDistanceMeters}m away, floor: ${b.floorLevel || 'Ground'})`).join('; ')}`
+      : 'No BLE beacon detected in immediate range.';
+
     const promptText = `
 You are an expert AI Location Specialist and Elder Pickup Assistant for Singapore and worldwide locations.
 The goal is to provide maximum location accuracy and reassurance for an elderly person waiting to be picked up by a caregiver, family member, or ride/emergency responder.
 
-Google Maps Platform Multi-API Grounding:
+Google Maps Platform Multi-API & BLE Grounding:
 - Raw GPS: Latitude ${latitude}, Longitude ${longitude} (Accuracy: ${accuracy}m)
 - ${roadsContext}
 - ${placesContext}
+- ${bleContext}
 - Reverse Geocoded Address Hint: ${approximateAddress || 'Not available'}
 - User Voice Notes / Speech: "${voiceNotes || 'None'}"
 - Additional Clues / Environment: "${manualClues || (contextPreset?.landmarkHint ?? 'None')}"
 
 TASK:
-1. Analyze the user's uploaded surroundings photo (if provided) along with the Roads API snapped curbside and Places API verified landmark list.
-2. Cross-reference visible features (storefront signs, awning colors, building numbers, door entrances, benches, pavement markers, transit stops, distinct street signs) against what Google Street View and Places API show at these coordinates.
-3. Determine refined/verified coordinates (prioritize the Roads API snapped curbside if the user is by the road, or entrance if near a verified Places POI).
-4. Extract 2-4 concrete, easily identifiable visual landmarks with high distinction (utilize real names from the Places API results when matching).
-5. Create crystal-clear pickup instructions for the driver (e.g. "Pull up directly in front of the taxi stand or main entrance. Elder is waiting under the sheltered walkway.").
-6. Create a warm, calming, simple voice summary for the elderly user (written in short, easy-to-hear sentences without technical jargon).
-7. Create safe waiting advice (e.g., "Stay under the sheltered walkway or bench. It is safe, dry, and brightly visible from the road.").
-8. Provide matching assessment for Google Street View comparison.
+1. Analyze the user's uploaded surroundings photo (if provided) along with the Roads API snapped curbside, Places API verified landmark list, and detected BLE Beacon micro-location signatures.
+2. Cross-reference visible features (storefront signs, awning colors, building numbers, door entrances, benches, pavement markers, transit stops, distinct street signs) against what Google Street View, Places API, and BLE beacons show at these coordinates.
+3. If high-strength BLE beacons are detected (RSSI > -70 dBm), leverage their exact micro-location position and floor level to refine accuracy down to sub-3-meter precision.
+4. Assess whether the senior is currently INDOORS (inside a mall/building/MRT), OUTDOORS at roadside, under an HDB VOID DECK, or under a SHELTERED PORCH based on ceilings, artificial lighting, floor tiles, columns, BLE beacons, and GPS attenuation.
+5. If indoors, identify the indoor context (e.g. "Inside Toa Payoh Hub Level 1 near FairPrice") and provide clear step-by-step guidance for the elder to reach the nearest vehicle pickup point or taxi bay.
+6. Determine refined/verified coordinates (prioritize BLE beacon coordinates if within immediate range, or Roads API snapped curbside if the user is by the road).
+7. Extract 2-4 concrete, easily identifiable visual landmarks with high distinction (utilize real names from Places/BLE API results when matching).
+8. Create crystal-clear pickup instructions for the driver (e.g. "Pull up directly in front of the taxi stand or main entrance. Elder is waiting under the sheltered walkway.").
+9. Create a warm, calming, simple voice summary for the elderly user (written in short, easy-to-hear sentences without technical jargon, mentioning if they need to step out to the pickup bay).
+10. Create safe waiting advice (e.g., "Stay under the sheltered walkway or bench. It is safe, dry, and brightly visible from the road.").
+11. Provide matching assessment for Google Street View comparison.
 
 Output your answer strictly using the provided JSON schema.`;
 
@@ -660,6 +673,14 @@ Output your answer strictly using the provided JSON schema.`;
           formattedAddress: { type: Type.STRING, description: 'Clear street address with number and city' },
           streetName: { type: Type.STRING, description: 'Primary street or avenue name' },
           nearbyCrossStreet: { type: Type.STRING, description: 'Nearest cross street or landmark zone' },
+          isIndoors: { type: Type.BOOLEAN, description: 'True if user is inside a shopping mall, building, underground concourse, or indoor lobby' },
+          environmentType: {
+            type: Type.STRING,
+            enum: ['indoor_mall', 'indoor_mrt', 'hdb_void_deck', 'sheltered_porch', 'outdoor_roadside', 'underground'],
+            description: 'Specific architectural environment type',
+          },
+          indoorContext: { type: Type.STRING, description: 'Description of indoor location (e.g. Inside Toa Payoh Hub near FairPrice)' },
+          indoorExitGuidance: { type: Type.STRING, description: 'Gentle instructions directing elder to the nearest vehicle pickup bay or taxi stand' },
           visualLandmarks: {
             type: Type.ARRAY,
             items: {
@@ -722,6 +743,8 @@ Output your answer strictly using the provided JSON schema.`;
           'formattedAddress',
           'streetName',
           'nearbyCrossStreet',
+          'isIndoors',
+          'environmentType',
           'visualLandmarks',
           'pickupInstructionsForDriver',
           'elderlyVoiceSummary',
@@ -784,6 +807,12 @@ Output your answer strictly using the provided JSON schema.`;
       },
       nearbyPlaces: nearbyPlaces.slice(0, 5),
       visualLandmarks: parsed.visualLandmarks || [],
+      isIndoors: Boolean(parsed.isIndoors),
+      environmentType: parsed.environmentType || (parsed.isIndoors ? 'indoor_mall' : 'outdoor_roadside'),
+      indoorContext: parsed.indoorContext || (parsed.isIndoors ? 'Inside building/concourse' : 'Outdoor street area'),
+      indoorExitGuidance: parsed.indoorExitGuidance || (parsed.isIndoors ? 'Please step towards the nearest ground floor entrance or taxi stand.' : 'Wait safely at the curbside.'),
+      bleBeacons: bleBeacons || [],
+      bleAccuracyBoost: Boolean(bleBeacons && bleBeacons.some((b: any) => b.rssi >= -70)),
       pickupInstructionsForDriver: parsed.pickupInstructionsForDriver || 'Please pull up to the exact pin location.',
       elderlyVoiceSummary: parsed.elderlyVoiceSummary || `You are at ${formattedAddress}. Your location is verified.`,
       safeWaitingAdvice: parsed.safeWaitingAdvice || 'Stay where you are in a visible and comfortable spot.',

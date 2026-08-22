@@ -94,6 +94,18 @@ export const LiveLocationCard: React.FC<LiveLocationCardProps> = ({
         </div>
       </div>
 
+      {/* Indoor Detection Guidance */}
+      {verification?.isIndoors && (
+        <div className="mb-5 rounded-xl border-2 border-amber-400 bg-amber-50 dark:bg-neutral-900 text-amber-950 dark:text-amber-200 p-4 space-y-1">
+          <div className="flex items-center gap-2 font-extrabold text-sm sm:text-base">
+            <span>🏠 INDOORS: {verification.indoorContext || 'Inside Building / Concourse'}</span>
+          </div>
+          <p className="text-xs sm:text-sm font-semibold">
+            <strong>Pickup Tip: </strong>{verification.indoorExitGuidance || 'Please step towards the ground floor entrance or taxi bay.'}
+          </p>
+        </div>
+      )}
+
       {/* Elder Voice Summary / Driver Note */}
       {verification && (
         <div className="border-ochre/30 bg-ochre-soft text-ink mb-5 rounded-xl border p-4">

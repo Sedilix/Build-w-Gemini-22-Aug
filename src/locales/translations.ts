@@ -88,6 +88,44 @@ export const TRANSLATIONS: Record<string, Partial<Record<Language, string>>> = {
     ta: 'மொழி',
   },
 
+  // ── Hero "Pick Me Up Here!" Camera Landing ─────────────────────────────
+  'hero.kicker': {
+    en: 'Step 1 — Show Us Where You Are',
+    zh: '第一步 — 让我们看看您的位置',
+    ms: 'Langkah 1 — Tunjukkan Lokasi Anda',
+    ta: 'படி 1 — நீங்கள் எங்கு இருக்கிறீர்கள் என்று காட்டுங்கள்',
+  },
+  'hero.subtitle': {
+    en: 'Point your camera at your surroundings, then tap the big button. We will confirm your location and alert your family.',
+    zh: '将相机对准周围环境，然后按大按钮。我们会确认您的位置并通知家人。',
+    ms: 'Halakan kamera ke sekeliling anda, kemudian ketik butang besar. Kami akan sahkan lokasi anda dan maklumkan keluarga.',
+    ta: 'உங்கள் சூழலை நோக்கி கேமராவை திருப்பி, பெரிய பொத்தானை அழுத்தவும். உங்கள் இடத்தை உறுதிப்படுத்தி குடும்பத்திற்கு அறிவிப்போம்.',
+  },
+  'hero.pickMeUp': {
+    en: '📸 Pick Me Up Here!',
+    zh: '📸 来这里接我！',
+    ms: '📸 Ambil Saya Di Sini!',
+    ta: '📸 என்னை இங்கு அழைத்துச் செல்லுங்கள்!',
+  },
+  'hero.capturing': {
+    en: 'Confirming your location...',
+    zh: '正在确认您的位置…',
+    ms: 'Mengesahkan lokasi anda...',
+    ta: 'உங்கள் இடம் உறுதிப்படுத்தப்படுகிறது...',
+  },
+  'hero.cameraDenied': {
+    en: 'Camera is off or unavailable. You can still tap the big button — we will use your GPS and a sample photo.',
+    zh: '相机已关闭或无法使用。您仍可按大按钮 — 我们会使用GPS和示例照片。',
+    ms: 'Kamera mati atau tidak tersedia. Anda masih boleh ketik butang besar — kami akan guna GPS dan gambar contoh.',
+    ta: 'கேமரா இல்லை. நீங்கள் இன்னும் பெரிய பொத்தானை அழுத்தலாம் — GPS மற்றும் மாதிரி புகைப்படம் பயன்படுத்தப்படும்.',
+  },
+  'hero.enableCamera': {
+    en: 'Turn On Camera',
+    zh: '开启相机',
+    ms: 'Hidupkan Kamera',
+    ta: 'கேமராவை இயக்கு',
+  },
+
   // ── Live Location Card ──────────────────────────────────────────────────
   'live.readAddress': {
     en: 'Read Address Out Loud',

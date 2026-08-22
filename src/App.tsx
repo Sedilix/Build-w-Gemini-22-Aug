@@ -8,6 +8,9 @@ import {
   HeaderAccessibility 
 } from './components/HeaderAccessibility';
 import { 
+  HeroPickMeUpCamera 
+} from './components/HeroPickMeUpCamera';
+import { 
   LiveLocationCard 
 } from './components/LiveLocationCard';
 import { 
@@ -55,6 +58,7 @@ import { LOCATION_PRESETS } from './data/samplePresets';
 import { speakSpeechmaticsOrFallback, stopSpeaking } from './utils/speech';
 import { getBatteryStatus, watchBattery } from './utils/telemetry';
 import { ensureMotionPermission, startFallDetection, FallDetectionHandle } from './utils/fallDetection';
+import { scanNearbyBLEBeacons } from './utils/ble';
 import { auth, subscribeToUserProfile, saveUserProfile, createIncident, updateIncident } from './lib/firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { AlertCircle, PhoneCall, ShieldAlert, Sparkles, Check } from 'lucide-react';
@@ -141,6 +145,9 @@ function SeniorSafeSpotHome() {
   );
   const [isAlertingFamily, setIsAlertingFamily] = useState(false);
   const [fallCountdown, setFallCountdown] = useState<number | null>(null);
+  // True only while a hero "Pick Me Up Here!" capture is being processed, so
+  // the background boot verification never disables the giant button.
+  const [heroBusy, setHeroBusy] = useState(false);
 
   const initialVerificationDoneRef = useRef(false);
   const lastIncidentGpsPushRef = useRef(0);
@@ -223,6 +230,9 @@ function SeniorSafeSpotHome() {
     ) => {
       setIsVerifyingAI(true);
       try {
+        // Scan nearby BLE beacons in parallel with photo & GPS
+        const bleBeacons = await scanNearbyBLEBeacons(coords.latitude, coords.longitude);
+
         const res = await fetch('/api/gemini/analyze-location', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -231,6 +241,7 @@ function SeniorSafeSpotHome() {
             photoBase64: photoBase64 || currentPhoto,
             voiceNotes: voiceClue || '',
             contextPreset: preset,
+            bleBeacons,
           }),
         });
 
@@ -325,20 +336,73 @@ function SeniorSafeSpotHome() {
     }
   }, [refreshGPS]);
 
-  // Handle Photo Snapped or Uploaded
-  const handlePhotoUpdate = (photoBase64: string, preset?: LocationPreset) => {
-    setCurrentPhoto(photoBase64);
-    const coords = gps || {
-      latitude: preset?.lat || 1.3327,
-      longitude: preset?.lng || 103.8479,
-      accuracy: 10,
-      heading: 0,
-      speed: 0,
-      altitude: 0,
-      timestamp: Date.now(),
-    };
-    triggerLocationVerification(coords, photoBase64, '', preset);
-  };
+  /**
+   * Hero "Pick Me Up Here!" one-tap flow: snap surroundings photo, grab fresh
+   * GPS, run Gemini landmark verification (voice confirmation plays inside),
+   * then auto-scroll the elder down to the verified location card.
+   */
+  const handlePickMeUp = useCallback(
+    (photoBase64: string | null) => {
+      const photo = photoBase64 || currentPhoto || LOCATION_PRESETS[0].sampleImageUrl;
+      if (photoBase64) setCurrentPhoto(photoBase64);
+
+      // Bring the verification card into view so the elder sees progress
+      document
+        .getElementById('card-live-location')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+      setHeroBusy(true);
+      setIsLoadingGPS(true);
+
+      const runVerification = (loc: GPSLocation) => {
+        setGps(loc);
+        setIsLoadingGPS(false);
+        triggerLocationVerification(loc, photo);
+      };
+
+      const fallbackLoc: GPSLocation =
+        gps || {
+          latitude: LOCATION_PRESETS[0].lat,
+          longitude: LOCATION_PRESETS[0].lng,
+          accuracy: LOCATION_PRESETS[0].accuracy,
+          heading: 0,
+          speed: 0,
+          altitude: 10,
+          timestamp: Date.now(),
+        };
+
+      if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            runVerification({
+              latitude: pos.coords.latitude,
+              longitude: pos.coords.longitude,
+              accuracy: pos.coords.accuracy || 15,
+              heading: pos.coords.heading,
+              speed: pos.coords.speed,
+              altitude: pos.coords.altitude,
+              timestamp: pos.timestamp,
+            });
+          },
+          (err) => {
+            console.warn('Hero GPS acquisition failed, using last known location:', err);
+            runVerification(fallbackLoc);
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+        );
+      } else {
+        runVerification(fallbackLoc);
+      }
+    },
+    [currentPhoto, gps, triggerLocationVerification]
+  );
+
+  // Release the hero busy state once its GPS + AI verification settles
+  useEffect(() => {
+    if (heroBusy && !isLoadingGPS && !isVerifyingAI) {
+      setHeroBusy(false);
+    }
+  }, [heroBusy, isLoadingGPS, isVerifyingAI]);
 
   // Handle Preset Selection
   const handleSelectPreset = (preset: LocationPreset) => {
@@ -614,6 +678,18 @@ function SeniorSafeSpotHome() {
 
       {/* Main Content Area */}
       <main className="max-w-7xl mx-auto w-full px-3 sm:px-6 py-6 sm:py-8 flex-1 space-y-6 sm:space-y-8">
+        {/* Hero: "Pick Me Up Here!" live camera landing experience */}
+        <HeroPickMeUpCamera
+          gps={gps}
+          verification={verification}
+          isAnalyzing={isVerifyingAI || isLoadingGPS || heroBusy}
+          isLoadingGPS={isLoadingGPS}
+          onPickMeUp={handlePickMeUp}
+          onSpeakAddress={handleSpeakAddress}
+          isSpeaking={isSpeaking}
+          settings={settings}
+        />
+
         {/* Section 1: Live Location Card with Voice Reading */}
         <LiveLocationCard
           gps={gps}
@@ -637,13 +713,11 @@ function SeniorSafeSpotHome() {
           isAlertingFamily={isAlertingFamily}
         />
 
-        {/* Section 3: Visual Surroundings Scanner & Google Street View Cross-Referencing */}
+        {/* Section 3: Street View cross-reference results for the hero "Pick Me Up" photo */}
         <VisualLandmarkScanner
           currentPhoto={currentPhoto}
           verification={verification}
           isAnalyzing={isVerifyingAI}
-          onCaptureOrUploadPhoto={handlePhotoUpdate}
-          onSelectPreset={handleSelectPreset}
           settings={settings}
         />
 

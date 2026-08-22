@@ -58,6 +58,12 @@ export interface LocationVerificationResult {
     address?: string;
   }>;
   visualLandmarks: LandmarkFeature[];
+  isIndoors?: boolean;
+  environmentType?: 'indoor_mall' | 'indoor_mrt' | 'hdb_void_deck' | 'sheltered_porch' | 'outdoor_roadside' | 'underground';
+  indoorContext?: string;
+  indoorExitGuidance?: string;
+  bleBeacons?: BLEBeaconScan[];
+  bleAccuracyBoost?: boolean; // True if BLE micro-location refined accuracy to < 3m
   pickupInstructionsForDriver: string;
   elderlyVoiceSummary: string;
   safeWaitingAdvice: string;
@@ -73,6 +79,23 @@ export interface LocationVerificationResult {
   photoUrl?: string;
 }
 
+export interface BLEBeaconScan {
+  id: string;
+  name: string;
+  uuid?: string;
+  major?: number;
+  minor?: number;
+  rssi: number; // dBm e.g. -62 dBm
+  proximity: 'immediate' | 'near' | 'far' | 'unknown'; // <1m, 1-3m, >3m
+  estimatedDistanceMeters: number;
+  locationName: string; // e.g. "Toa Payoh Hub Taxi Stand 1 - Beacon #04"
+  floorLevel?: string; // e.g. "Level 1" or "Basement 1 Concourse"
+  zoneType: 'transit_hub' | 'hospital' | 'hdb_estate' | 'shopping_mall' | 'caregiver_tag';
+  lat?: number;
+  lng?: number;
+  batteryPercent?: number;
+}
+
 export interface EmergencyContact {
   id: string;
   name: string;
@@ -82,6 +105,8 @@ export interface EmergencyContact {
   bgColor: string;
   isPrimary: boolean;
   notes?: string;
+  /** System contacts (e.g. 995 SCDF) are hard-coded and cannot be removed */
+  locked?: boolean;
 }
 
 export type BloodType = 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-' | 'Unknown';
