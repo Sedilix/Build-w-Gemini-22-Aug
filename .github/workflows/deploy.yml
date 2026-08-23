@@ -50,10 +50,24 @@ jobs:
           name: dist
           path: dist/
 
+  check-deploy-secrets:
+    name: Check deploy secrets
+    runs-on: ubuntu-latest
+    outputs:
+      has_gcp_key: ${{ steps.check.outputs.has_gcp_key }}
+    steps:
+      # `secrets` cannot be used in a job-level `if`, so its presence is
+      # probed here and exposed as an output the deploy job can condition on.
+      - name: Probe GCP_SA_KEY
+        id: check
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+        run: echo "has_gcp_key=$([ -n "$GCP_SA_KEY" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
   deploy:
     name: Deploy to Cloud Run (asia-southeast1)
-    needs: quality
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.GCP_SA_KEY != ''
+    needs: [quality, check-deploy-secrets]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.check-deploy-secrets.outputs.has_gcp_key == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
