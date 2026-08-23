@@ -199,6 +199,24 @@ export const TRANSLATIONS: Record<string, Partial<Record<Language, string>>> = {
     ms: 'Membantu pemandu atau paramedik mengenali anda.',
     ta: 'ஓட்டுநர் அல்லது மருத்துவர் உங்களை அடையாளம் காண உதவும்.',
   },
+  'onboard.takeSelfie': {
+    en: 'Take Live Photo',
+    zh: '拍摄实时照片',
+    ms: 'Ambil Foto Langsung',
+    ta: 'நேரலை புகைப்படம் எடு',
+  },
+  'onboard.retakeSelfie': {
+    en: 'Retake Photo',
+    zh: '重拍照片',
+    ms: 'Ambil Semula Foto',
+    ta: 'மீண்டும் புகைப்படம் எடு',
+  },
+  'onboard.cameraUnavailable': {
+    en: 'No live camera here, so the photo is skipped. Photos must be taken live to stay authentic — you can add one later from your profile.',
+    zh: '此设备无法使用实时相机，照片已跳过。为确保真实，照片必须实时拍摄——您可稍后在个人资料中添加。',
+    ms: 'Tiada kamera langsung di sini, jadi foto dilangkau. Foto mesti diambil secara langsung supaya asli — anda boleh menambahnya kemudian dari profil anda.',
+    ta: 'இங்கு நேரலை கேமரா இல்லை, புகைப்படம் தவிர்க்கப்பட்டது. உண்மையாக இருக்க புகைப்படம் நேரலையில் எடுக்கப்பட வேண்டும் — பிறகு சுயவிவரத்திலிருந்து சேர்க்கலாம்.',
+  },
   'onboard.importContacts': {
     en: 'Import From Phone Contacts',
     zh: '从手机通讯录导入',

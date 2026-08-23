@@ -59,8 +59,9 @@ const EDDYSTONE_FRAME_UID = 0x00;
 const EDDYSTONE_FRAME_TLM = 0x20;
 
 const BEACON_STALE_MS = 60_000;
+/** GPS-proximity matching radius: beyond this a venue beacon cannot plausibly be in range. */
+const GEOFENCE_MATCH_RADIUS_M = 100;
 const PAIRED_TAG_STORAGE_KEY = 'senior_safespot_ble_tag';
-const VIRTUAL_BLE_STORAGE_KEY = 'safespot_virtual_ble_enabled';
 
 // ── Singapore Surveyed Venue Beacon Registry ─────────────────────────────────
 
@@ -180,11 +181,13 @@ export const KNOWN_VENUE_BEACONS: KnownVenueBeacon[] = [
 ];
 
 export function lookupKnownBeacon(beaconKey: string): KnownVenueBeacon | undefined {
+  // Exact match only: fuzzy substring matching could attribute a stranger's
+  // device to a surveyed venue and silently move the pickup pin.
   const normalized = beaconKey.toLowerCase().replace(/[^a-z0-9]/g, '');
-  return KNOWN_VENUE_BEACONS.find((b) => {
-    const keyNorm = b.beaconKey.toLowerCase().replace(/[^a-z0-9]/g, '');
-    return keyNorm === normalized || normalized.includes(keyNorm) || keyNorm.includes(normalized);
-  });
+  if (normalized.length < 8) return undefined;
+  return KNOWN_VENUE_BEACONS.find(
+    (b) => b.beaconKey.toLowerCase().replace(/[^a-z0-9]/g, '') === normalized
+  );
 }
 
 // ── Math & Distance Helpers ──────────────────────────────────────────────────
@@ -314,7 +317,6 @@ const liveBeacons = new Map<string, BLEBeaconScan>();
 let activeScan: BluetoothLEScan | null = null;
 let advertisementHandler: ((e: BluetoothAdvertisementEvent) => void) | null = null;
 let scanState: BLEScanState = { status: 'idle', beaconCount: 0 };
-let virtualBeaconEnabled = true;
 
 type ScanListener = (state: BLEScanState, beacons: BLEBeaconScan[]) => void;
 const listeners = new Set<ScanListener>();
@@ -379,6 +381,7 @@ function recordAdvertisement(event: BluetoothAdvertisementEvent) {
     lat: known?.lat,
     lng: known?.lng,
     format: parsed.format,
+    source: 'radio',
     isKnownVenue: Boolean(known),
     isPairedTag,
     lastSeen: Date.now(),
@@ -392,7 +395,11 @@ function recordAdvertisement(event: BluetoothAdvertisementEvent) {
 /**
  * Match surveyed Singapore venue beacons based on the user's current GPS
  * coordinates (e.g. when user is near one-north, Toa Payoh Hub, or SGH).
- * Ensures iOS Safari and desktop testing receive full sub-3m accuracy support.
+ *
+ * Honesty rule: this never invents a radio measurement. The reported
+ * distance is the measured GPS distance itself (clamped to a 1.2 m floor)
+ * and the result is flagged `source: 'geofence'` so downstream consumers
+ * can tell it apart from a beacon heard over the air.
  */
 export function updateBeaconsFromGps(lat: number, lng: number): BLEBeaconScan[] {
   let nearestMatch: KnownVenueBeacon | null = null;
@@ -400,18 +407,20 @@ export function updateBeaconsFromGps(lat: number, lng: number): BLEBeaconScan[] 
 
   for (const beacon of KNOWN_VENUE_BEACONS) {
     const dist = calculateGpsDistanceMeters(lat, lng, beacon.lat, beacon.lng);
-    if (dist <= 350 && dist < minDistance) {
+    if (dist <= GEOFENCE_MATCH_RADIUS_M && dist < minDistance) {
       minDistance = dist;
       nearestMatch = beacon;
     }
   }
 
-  // If near a surveyed beacon location, inject it into liveBeacons
-  if (nearestMatch && minDistance <= 350) {
-    const simulatedDist = Math.max(1.2, Math.min(minDistance, 4.5));
-    // Calculate synthetic RSSI: e.g. at 1.8m -> ~ -65 dBm
-    const syntheticRssi = Math.round(nearestMatch.measuredPowerAt1m - 10 * 2.2 * Math.log10(simulatedDist));
-    const proximity: BLEBeaconScan['proximity'] = simulatedDist <= 1.5 ? 'immediate' : simulatedDist <= 5.0 ? 'near' : 'far';
+  if (nearestMatch && minDistance <= GEOFENCE_MATCH_RADIUS_M) {
+    // Never report a distance shorter than what GPS actually measured.
+    const estimatedDistance = Math.max(1.2, Math.round(minDistance * 10) / 10);
+    // Back-solve the RSSI such a distance would produce, purely so existing
+    // signal-strength UI keeps working; the source flag says it is an estimate.
+    const syntheticRssi = Math.round(nearestMatch.measuredPowerAt1m - 10 * 2.2 * Math.log10(estimatedDistance));
+    const proximity: BLEBeaconScan['proximity'] =
+      estimatedDistance <= 1.5 ? 'immediate' : estimatedDistance <= 5.0 ? 'near' : 'far';
 
     const scanResult: BLEBeaconScan = {
       id: nearestMatch.beaconKey,
@@ -419,13 +428,14 @@ export function updateBeaconsFromGps(lat: number, lng: number): BLEBeaconScan[] 
       rssi: syntheticRssi,
       txPower: nearestMatch.measuredPowerAt1m,
       proximity,
-      estimatedDistanceMeters: simulatedDist,
+      estimatedDistanceMeters: estimatedDistance,
       locationName: nearestMatch.locationName,
       floorLevel: nearestMatch.floorLevel,
       zoneType: nearestMatch.zoneType,
       lat: nearestMatch.lat,
       lng: nearestMatch.lng,
       format: 'ibeacon',
+      source: 'geofence',
       isKnownVenue: true,
       isPairedTag: false,
       lastSeen: Date.now(),
@@ -449,10 +459,11 @@ export async function getBLECapability(): Promise<BLECapability> {
   const bluetooth = getBluetooth();
   if (!bluetooth) {
     return {
-      supported: true, // Supported via Assisted/Geofenced Micro-Location on iOS/Safari
+      supported: false,
       canScan: false,
       canPairDevice: false,
-      reason: 'Hardware Web Bluetooth not exposed by iOS/Safari. Assisted Micro-Location Geofencing is active.',
+      reason:
+        'This browser does not expose Bluetooth scanning (e.g. iOS Safari). Nearby surveyed venues are still matched using GPS instead.',
     };
   }
 
@@ -487,36 +498,30 @@ export async function startBeaconScan(currentGps?: { latitude: number; longitude
       return scanState;
     } catch (err: any) {
       console.warn('Hardware BLE scan request error:', err.message);
+      if (advertisementHandler) {
+        bluetooth.removeEventListener('advertisementreceived', advertisementHandler);
+        advertisementHandler = null;
+      }
+      // Never fabricate beacons after a failed radio start: report what is
+      // really known (GPS-matched venues, if any) and say the radio failed.
+      setScanState({
+        status: liveBeacons.size > 0 ? 'scanning' : 'unavailable',
+        beaconCount: liveBeacons.size,
+        error: err?.message || 'Bluetooth scan could not start.',
+      });
+      return scanState;
     }
   }
 
-  // Fallback / Assisted mode for iOS Safari or without hardware radio:
-  // Active micro-location geofencing state
-  setScanState({ status: 'scanning', beaconCount: Math.max(1, liveBeacons.size) });
-
-  // If no beacon in range yet, default to LaunchPad @ one-north or Toa Payoh Hub beacon for demonstration
-  if (liveBeacons.size === 0) {
-    const defaultBeacon = KNOWN_VENUE_BEACONS[0]; // Train Pod @ one-north
-    liveBeacons.set(defaultBeacon.beaconKey, {
-      id: defaultBeacon.beaconKey,
-      name: defaultBeacon.locationName,
-      rssi: -64,
-      txPower: defaultBeacon.measuredPowerAt1m,
-      proximity: 'near',
-      estimatedDistanceMeters: 1.8,
-      locationName: defaultBeacon.locationName,
-      floorLevel: defaultBeacon.floorLevel,
-      zoneType: defaultBeacon.zoneType,
-      lat: defaultBeacon.lat,
-      lng: defaultBeacon.lng,
-      format: 'ibeacon',
-      isKnownVenue: true,
-      isPairedTag: false,
-      lastSeen: Date.now(),
-    });
-    setScanState({ status: 'scanning', beaconCount: liveBeacons.size });
-  }
-
+  // No Bluetooth radio in this browser (e.g. iOS Safari): stay honest about
+  // what is actually known — only GPS-matched venue beacons, if any exist.
+  setScanState({
+    status: liveBeacons.size > 0 ? 'scanning' : 'unavailable',
+    beaconCount: liveBeacons.size,
+    error: liveBeacons.size === 0
+      ? 'No Bluetooth radio here; surveyed venues are matched from GPS when you are nearby.'
+      : undefined,
+  });
   return scanState;
 }
 
@@ -532,6 +537,9 @@ export function stopBeaconScan(): void {
   }
   activeScan = null;
   advertisementHandler = null;
+  // Turning scanning off also drops everything remembered, so nothing stale
+  // can resurface in a later verification.
+  liveBeacons.clear();
   setScanState({ status: 'idle', beaconCount: 0 });
 }
 
@@ -546,24 +554,12 @@ function getPairedTagId(): string | null {
 export async function pairSafetyTag(): Promise<{ paired: boolean; name?: string; error?: string }> {
   const bluetooth = getBluetooth();
   if (!bluetooth?.requestDevice) {
-    // Enable virtual safety tag for testing
-    const defaultTag: BLEBeaconScan = {
-      id: 'safetag-01',
-      name: "Senior SafeSpot Pendant (Paired)",
-      rssi: -62,
-      txPower: -59,
-      proximity: 'immediate',
-      estimatedDistanceMeters: 1.4,
-      locationName: "Senior's paired safety tag",
-      zoneType: 'caregiver_tag',
-      format: 'generic',
-      isKnownVenue: false,
-      isPairedTag: true,
-      lastSeen: Date.now(),
+    // No device chooser means pairing is genuinely impossible here. Claiming
+    // a simulated tag would make caregivers believe a pendant is attached.
+    return {
+      paired: false,
+      error: 'Bluetooth pairing is not available in this browser, so a safety tag cannot be paired.',
     };
-    liveBeacons.set('safetag-01', defaultTag);
-    setScanState({ status: 'scanning', beaconCount: liveBeacons.size });
-    return { paired: true, name: 'Senior Safety Tag (Simulated)' };
   }
 
   try {
@@ -611,34 +607,10 @@ export function hasVenueGradePrecision(beacons: BLEBeaconScan[]): boolean {
 }
 
 export function getBeaconsForVerification(): BLEBeaconScan[] {
-  const beacons = getNearbyBeacons();
-  if (beacons.length > 0) return beacons;
-
-  // If scan is active or simulated, return the matched venue beacon
-  if (scanState.status === 'scanning' && KNOWN_VENUE_BEACONS.length > 0) {
-    const def = KNOWN_VENUE_BEACONS[0];
-    return [
-      {
-        id: def.beaconKey,
-        name: def.locationName,
-        rssi: -64,
-        txPower: def.measuredPowerAt1m,
-        proximity: 'near',
-        estimatedDistanceMeters: 1.8,
-        locationName: def.locationName,
-        floorLevel: def.floorLevel,
-        zoneType: def.zoneType,
-        lat: def.lat,
-        lng: def.lng,
-        format: 'ibeacon',
-        isKnownVenue: true,
-        isPairedTag: false,
-        lastSeen: Date.now(),
-      },
-    ];
-  }
-
-  return [];
+  // Only what was genuinely observed. Inventing a default venue beacon here
+  // would tell the verification backend the senior is standing somewhere
+  // they are not.
+  return getNearbyBeacons();
 }
 
 export function getScanState(): BLEScanState {

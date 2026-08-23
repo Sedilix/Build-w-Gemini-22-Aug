@@ -14,9 +14,6 @@ import {
   LiveLocationCard 
 } from './components/LiveLocationCard';
 import { 
-  VisualLandmarkScanner 
-} from './components/VisualLandmarkScanner';
-import { 
   InteractiveMapDisplay 
 } from './components/InteractiveMapDisplay';
 import { 
@@ -51,15 +48,14 @@ import {
   LocationVerificationResult, 
   AccessibilitySettings, 
   EmergencyContact, 
-  LocationPreset,
   UserProfile,
   SavedPlace,
   BatteryStatus,
+  SensorMetadata,
   SPEECHMATICS_VOICE_OPTIONS
 } from './types';
-import { DEFAULT_CONTACTS, ensureEmergency995 } from './data/defaultContacts';
+import { ensureEmergency995 } from './data/defaultContacts';
 import { OnboardingWizard, OnboardingResult } from './components/OnboardingWizard';
-import { LOCATION_PRESETS } from './data/samplePresets';
 import { speakSpeechmaticsOrFallback, stopSpeaking } from './utils/speech';
 import { getBatteryStatus, watchBattery } from './utils/telemetry';
 import { 
@@ -76,7 +72,7 @@ import { getPreferredContact } from './utils/contacts';
 import { resolveSavedPlace } from './utils/places';
 import { auth, subscribeToUserProfile, saveUserProfile, createIncident, updateIncident } from './lib/firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { AlertCircle, PhoneCall, ShieldAlert, Sparkles, Check } from 'lucide-react';
+import { AlertCircle, PhoneCall, ShieldAlert, Sparkles, Check, RefreshCw } from 'lucide-react';
 import { t } from './locales/translations';
 
 export default function App() {
@@ -113,13 +109,16 @@ function SeniorSafeSpotHome() {
         if (parsed && !['en', 'zh', 'ms', 'ta'].includes(parsed.language)) {
           parsed.language = 'en';
         }
+        // One-time migration: voice readout is now on-demand by default, so any
+        // previously persisted "auto speak" preference is reset to off.
+        if (parsed) parsed.spokenGuidance = false;
         return parsed;
       }
     } catch (e) {}
     return {
       contrastTheme: 'normal',
       fontSize: 'large', // Default large for elderly readability
-      spokenGuidance: true,
+      spokenGuidance: false, // On-demand by default — tap "Listen" to hear the address
       simplifiedMode: false,
       haptics: true,
       alwaysShowStreetView: true,
@@ -137,11 +136,14 @@ function SeniorSafeSpotHome() {
       // list synced from another device, must never leave them without it.
       if (saved) return ensureEmergency995(JSON.parse(saved));
     } catch (e) {}
-    return ensureEmergency995(DEFAULT_CONTACTS);
+    // No sample people: a fresh install contains only the locked 995 entry,
+    // and real family contacts are added during onboarding or from Settings.
+    return ensureEmergency995([]);
   });
 
   // State: Telemetry, Photo & AI Verification
   const [gps, setGps] = useState<GPSLocation | null>(null);
+  const [gpsError, setGpsError] = useState<string | null>(null);
   const [currentPhoto, setCurrentPhoto] = useState<string | null>(null);
   const [verification, setVerification] = useState<LocationVerificationResult | null>(null);
   const [isLoadingGPS, setIsLoadingGPS] = useState(false);
@@ -256,8 +258,8 @@ function SeniorSafeSpotHome() {
       coords: { latitude: number; longitude: number; accuracy?: number; heading?: number; altitude?: number; speed?: number },
       photoBase64?: string | null,
       voiceClue?: string,
-      preset?: LocationPreset,
-      isFromPickMeUp = false
+      isFromPickMeUp = false,
+      sensor?: SensorMetadata | null
     ) => {
       setIsVerifyingAI(true);
       try {
@@ -274,8 +276,8 @@ function SeniorSafeSpotHome() {
             gps: coords,
             photoBase64: photoBase64 || currentPhoto,
             voiceNotes: voiceClue || '',
-            contextPreset: preset,
             bleBeacons,
+            sensor: sensor || null,
           }),
         });
 
@@ -329,25 +331,28 @@ function SeniorSafeSpotHome() {
             heading: pos.coords.heading,
             speed: pos.coords.speed,
             altitude: pos.coords.altitude,
+            altitudeAccuracy: pos.coords.altitudeAccuracy ?? null,
             timestamp: pos.timestamp,
           };
           setGps(loc);
+          setGpsError(null);
           setIsLoadingGPS(false);
           triggerLocationVerification(loc, currentPhoto);
         },
         (err) => {
-          console.warn('Geolocation failed or permission denied, using default preset:', err);
+          // Honest failure: never invent a location. Tell the senior what
+          // happened and offer a retry.
+          console.warn('Geolocation failed or permission denied:', err);
           setIsLoadingGPS(false);
-          // Default to the first sample preset (Toa Payoh Hub) so app always works
-          const defaultPreset = LOCATION_PRESETS[0];
-          handleSelectPreset(defaultPreset);
+          setGpsError(
+            'We could not find your location. Please allow location access, then tap Try Again.'
+          );
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
       );
     } else {
       setIsLoadingGPS(false);
-      const defaultPreset = LOCATION_PRESETS[0];
-      handleSelectPreset(defaultPreset);
+      setGpsError('Location services are not available on this device.');
     }
   }, [currentPhoto, triggerLocationVerification]);
 
@@ -367,7 +372,7 @@ function SeniorSafeSpotHome() {
    * then auto-scroll the elder down to the verified location card.
    */
   const handlePickMeUp = useCallback(
-    async (snappedPhotoBase64?: string, place?: SavedPlace) => {
+    async (snappedPhotoBase64?: string, place?: SavedPlace, sensor?: SensorMetadata) => {
       setHeroBusy(true);
 
       // This tap is a user gesture, which is the only context a browser will
@@ -381,7 +386,7 @@ function SeniorSafeSpotHome() {
         if (snappedPhotoBase64) {
           setCurrentPhoto(snappedPhotoBase64);
         }
-        triggerLocationVerification(coords, photoToUse, '', undefined, true);
+        triggerLocationVerification(coords, photoToUse, '', true, sensor);
       };
 
       // "I'm at home / work / my clinic": trust the senior's own saved place
@@ -407,15 +412,16 @@ function SeniorSafeSpotHome() {
         console.warn('Saved place could not be geocoded, using live GPS instead:', place.address);
       }
 
-      const fallbackLoc: GPSLocation = gps || {
-        latitude: LOCATION_PRESETS[0].lat,
-        longitude: LOCATION_PRESETS[0].lng,
-        accuracy: LOCATION_PRESETS[0].accuracy,
-        heading: 0,
-        speed: 0,
-        altitude: 0,
-        timestamp: Date.now(),
-      };
+      // No invented coordinates: verification only ever runs on the senior's
+      // own saved place, a live GPS fix, or their last known real fix.
+      if (!gps) {
+        console.warn('Hero tap without any GPS fix available.');
+        setGpsError(
+          'We could not find your location. Please allow location access, then tap Try Again.'
+        );
+        setHeroBusy(false);
+        return;
+      }
 
       if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
         navigator.geolocation.getCurrentPosition(
@@ -428,19 +434,21 @@ function SeniorSafeSpotHome() {
               heading: pos.coords.heading,
               speed: pos.coords.speed,
               altitude: pos.coords.altitude,
+              altitudeAccuracy: pos.coords.altitudeAccuracy ?? null,
               timestamp: pos.timestamp,
             };
             setGps(freshLoc);
+            setGpsError(null);
             runVerification(freshLoc);
           },
           (err) => {
             console.warn('Hero GPS acquisition failed, using last known location:', err);
-            runVerification(fallbackLoc);
+            runVerification(gps);
           },
           { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
         );
       } else {
-        runVerification(fallbackLoc);
+        runVerification(gps);
       }
     },
     [currentPhoto, gps, triggerLocationVerification]
@@ -452,22 +460,6 @@ function SeniorSafeSpotHome() {
       setHeroBusy(false);
     }
   }, [heroBusy, isLoadingGPS, isVerifyingAI]);
-
-  // Handle Preset Selection
-  const handleSelectPreset = (preset: LocationPreset) => {
-    const newLoc: GPSLocation = {
-      latitude: preset.lat,
-      longitude: preset.lng,
-      accuracy: preset.accuracy,
-      heading: 45,
-      speed: 0,
-      altitude: 12,
-      timestamp: Date.now(),
-    };
-    setGps(newLoc);
-    setCurrentPhoto(preset.sampleImageUrl);
-    triggerLocationVerification(newLoc, preset.sampleImageUrl, '', preset);
-  };
 
   // Speak address aloud
   const handleSpeakAddress = () => {
@@ -603,18 +595,17 @@ function SeniorSafeSpotHome() {
         setFallCountdown(10);
         playEmergencyAlarmSiren();
 
-        if (settings.spokenGuidance) {
-          const alertText = event.type === 'crash'
-            ? 'Severe vehicle crash detected! Notifying SCDF emergency 995 in 10 seconds. Tap I am okay to cancel.'
-            : `${t('fall.title', lang)}. ${t('fall.desc', lang)}`;
-          speakSpeechmaticsOrFallback(
-            alertText,
-            settings.speechmaticsVoice || 'sarah',
-            undefined,
-            0.95,
-            lang
-          );
-        }
+        // Life-safety alert: always spoken regardless of the guidance toggle.
+        const alertText = event.type === 'crash'
+          ? 'Severe vehicle crash detected! Notifying SCDF emergency 995 in 10 seconds. Tap I am okay to cancel.'
+          : `${t('fall.title', lang)}. ${t('fall.desc', lang)}`;
+        speakSpeechmaticsOrFallback(
+          alertText,
+          settings.speechmaticsVoice || 'sarah',
+          undefined,
+          0.95,
+          lang
+        );
       });
     };
 
@@ -638,7 +629,7 @@ function SeniorSafeSpotHome() {
       if (armFromGesture) window.removeEventListener('pointerdown', armFromGesture);
       handle?.stop();
     };
-  }, [settings.fallDetection, settings.crashDetection, settings.spokenGuidance, settings.speechmaticsVoice, lang]);
+  }, [settings.fallDetection, settings.crashDetection, settings.speechmaticsVoice, lang]);
 
   // Fall/Crash countdown: reassuring audio + siren + cancel button, auto-dials 995 at 0
   useEffect(() => {
@@ -665,33 +656,6 @@ function SeniorSafeSpotHome() {
       window.location.href = 'tel:995';
     }
   }, [fallCountdown, activeImpactEvent, createLiveIncident]);
-
-  // Test Simulator Handler for Crash & Fall Emergency Drills
-  const handleSimulateImpact = (type: 'crash' | 'fall') => {
-    const mockEvent: CrashEventData = {
-      type,
-      impactGForce: type === 'crash' ? 4.2 : 2.4,
-      speedKmh: type === 'crash' ? 52 : 0,
-      rotationRateDps: type === 'crash' ? 340 : 45,
-      timestamp: Date.now(),
-    };
-    setActiveImpactEvent(mockEvent);
-    setFallCountdown(10);
-    playEmergencyAlarmSiren();
-
-    if (settings.spokenGuidance) {
-      const alertText = type === 'crash'
-        ? 'Severe vehicle crash detected! Notifying SCDF emergency 995 in 10 seconds. Tap I am okay to cancel.'
-        : `${t('fall.title', lang)}. ${t('fall.desc', lang)}`;
-      speakSpeechmaticsOrFallback(
-        alertText,
-        settings.speechmaticsVoice || 'sarah',
-        undefined,
-        0.95,
-        lang
-      );
-    }
-  };
 
   // Emergency SOS Trigger with 5-second cancelable countdown
   const handleEmergencySOS = () => {
@@ -878,6 +842,20 @@ function SeniorSafeSpotHome() {
           settings={settings}
         />
 
+        {/* Honest GPS failure banner — no invented locations, just a clear retry */}
+        {gpsError && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brick/30 bg-brick-soft px-4 py-3">
+            <p className="flex items-center gap-2 text-sm font-bold text-brick-deep">
+              <AlertCircle className="h-5 w-5 shrink-0" />
+              {gpsError}
+            </p>
+            <button type="button" onClick={refreshGPS} className="btn btn-md btn-secondary">
+              <RefreshCw className="h-4 w-4" />
+              Try Again
+            </button>
+          </div>
+        )}
+
         {/* Section 1: Live Location Card with Voice Reading */}
         <LiveLocationCard
           gps={gps}
@@ -901,15 +879,7 @@ function SeniorSafeSpotHome() {
           isAlertingFamily={isAlertingFamily}
         />
 
-        {/* Section 3: Street View cross-reference results for the hero "Pick Me Up" photo */}
-        <VisualLandmarkScanner
-          currentPhoto={currentPhoto}
-          verification={verification}
-          isAnalyzing={isVerifyingAI}
-          settings={settings}
-        />
-
-        {/* Section 4: Interactive Live Map Display */}
+        {/* Section 3: Interactive Live Map Display */}
         <InteractiveMapDisplay
           gps={gps}
           verification={verification}
@@ -953,7 +923,6 @@ function SeniorSafeSpotHome() {
         settings={settings}
         onUpdateSettings={setSettings}
         onOpenManageContacts={() => setIsContactsModalOpen(true)}
-        onSimulateImpact={handleSimulateImpact}
       />
 
       <CaregiverPreviewModal

@@ -11,7 +11,7 @@ import {
   ExternalLink, 
   ShieldCheck
 } from 'lucide-react';
-import { APIProvider, Map, AdvancedMarker, Pin } from '@vis.gl/react-google-maps';
+import { APIProvider, Map, AdvancedMarker, Pin, Circle } from '@vis.gl/react-google-maps';
 import { GPSLocation, LocationVerificationResult, AccessibilitySettings } from '../types';
 
 interface InteractiveMapDisplayProps {
@@ -47,6 +47,8 @@ export const InteractiveMapDisplay: React.FC<InteractiveMapDisplayProps> = ({
   const lat = verification?.verifiedCoordinates?.lat ?? gps?.latitude ?? 1.3327;
   const lng = verification?.verifiedCoordinates?.lng ?? gps?.longitude ?? 103.8479;
   const address = verification?.formattedAddress || 'Locating current spot in Singapore...';
+  const accuracyMeters =
+    verification?.originalCoordinates?.accuracyMeters ?? gps?.accuracy ?? null;
 
   const mapsApiKey = dynamicKey;
 
@@ -69,6 +71,8 @@ export const InteractiveMapDisplay: React.FC<InteractiveMapDisplayProps> = ({
             </h3>
             <p className="text-ink-soft mt-1 text-sm font-normal sm:text-base">
               Precision coordinate: {lat.toFixed(5)}, {lng.toFixed(5)}
+              {accuracyMeters != null && ` • ±${Math.round(accuracyMeters)}m`}
+              {verification?.refinedByCandidate && ' • panorama-refined'}
             </p>
           </div>
         </div>
@@ -96,6 +100,20 @@ export const InteractiveMapDisplay: React.FC<InteractiveMapDisplayProps> = ({
               <AdvancedMarker position={{ lat, lng }}>
                 <Pin background="#2f6d5b" glyphColor="#f6f4ec" borderColor="#24564a" scale={1.3} />
               </AdvancedMarker>
+
+              {/* GNSS accuracy radius around the raw fix — the verified pin
+                  should sit inside this circle when there is no drift. */}
+              {gps && typeof gps.accuracy === 'number' && gps.accuracy > 0 && (
+                <Circle
+                  center={{ lat: gps.latitude, lng: gps.longitude }}
+                  radius={gps.accuracy}
+                  strokeColor="#2f6d5b"
+                  strokeOpacity={0.6}
+                  strokeWeight={2}
+                  fillColor="#2f6d5b"
+                  fillOpacity={0.15}
+                />
+              )}
             </Map>
           </APIProvider>
         ) : (

@@ -300,15 +300,14 @@ export const VoiceCommandOverlay: React.FC<VoiceCommandOverlayProps> = ({
       setAssistantResponse(responseText);
       setRecognizedAction(data.action);
 
-      // Step 3: Speak aloud using Speechmatics TTS / Speech Synthesis for elder accessibility
-      if (settings.spokenGuidance) {
-        await speakSpeechmaticsOrFallback(
-          responseText, 
-          settings.speechmaticsVoice || 'sarah',
-          undefined,
-          settings.speechmaticsRate ?? 0.85
-        );
-      }
+      // Step 3: Speak the reply aloud. This is on-demand by definition — the
+      // senior spoke first — so it is not gated behind the spokenGuidance toggle.
+      await speakSpeechmaticsOrFallback(
+        responseText, 
+        settings.speechmaticsVoice || 'sarah',
+        undefined,
+        settings.speechmaticsRate ?? 0.85
+      );
 
       // Step 4: Execute structured physical action with reassuring delay
       if (data.action === 'SEND_LOCATION') {
@@ -344,27 +343,27 @@ export const VoiceCommandOverlay: React.FC<VoiceCommandOverlayProps> = ({
   return (
     <div
       id="modal-voice-command-overlay"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md"
+      className="voice-backdrop"
     >
-      <div className="w-full max-w-2xl rounded-2xl border border-[#4a4232] bg-[#241f16] p-6 text-[#f1ead9] shadow-2xl sm:p-8">
+      <div className="voice-panel">
         {/* Top bar */}
-        <div className="mb-6 flex items-center justify-between border-b border-[#4a4232] pb-4">
+        <div className="mb-6 flex items-center justify-between border-b voice-divider pb-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-[#4a4232] bg-[#2e281d] text-emerald-400">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-[#4a4232] bg-[#2e281d] voice-accent">
               <Radio className="h-5 w-5 animate-pulse" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-display text-2xl leading-none font-bold tracking-tight text-[#f7f1e3]">
+                <h3 className="font-display text-2xl leading-none font-bold tracking-tight voice-text">
                   Voice Assistant
                 </h3>
                 {isSpeechmaticsActive && (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-[#5a5140] bg-[#2e281d] px-2.5 py-0.5 text-xs font-bold text-[#d8cdb4]">
+                  <span className="voice-chip">
                     <Waves className="h-3.5 w-3.5 animate-pulse" /> Speechmatics STT
                   </span>
                 )}
               </div>
-              <p className="mt-1 text-sm font-normal text-[#b5ab97] sm:text-base">
+              <p className="mt-1 text-sm font-normal voice-subtle sm:text-base">
                 Powered by Speechmatics Realtime SDK & Gemini Reasoning
               </p>
             </div>
@@ -380,12 +379,12 @@ export const VoiceCommandOverlay: React.FC<VoiceCommandOverlayProps> = ({
                   onClose();
                   onOpenSettings();
                 }}
-                className="flex items-center gap-1.5 rounded-xl border border-[#5a5140] bg-[#2e281d] px-3 py-2 text-sm font-bold text-[#d8cdb4] transition-colors hover:bg-[#383123]"
+                className="flex items-center gap-1.5 rounded-xl border border-[#5a5140] bg-[#2e281d] px-3 py-2 text-sm font-bold voice-subtle transition-all hover:bg-[#383123] active:scale-[0.97]"
                 title="Change Speechmatics voice"
               >
-                <Volume2 className="h-4 w-4 text-emerald-400" />
+                <Volume2 className="h-4 w-4 voice-accent" />
                 <span className="hidden sm:inline">Voice:</span>
-                <span className="uppercase text-[#f7f1e3]">{settings.speechmaticsVoice || 'SARAH'}</span>
+                <span className="uppercase voice-text">{settings.speechmaticsVoice || 'SARAH'}</span>
               </button>
             )}
 
@@ -395,7 +394,7 @@ export const VoiceCommandOverlay: React.FC<VoiceCommandOverlayProps> = ({
                 cleanupAudioSession();
                 onClose();
               }}
-              className="accessible-tap rounded-xl p-2 text-[#b5ab97] transition-colors hover:bg-[#2e281d] hover:text-[#f7f1e3]"
+              className="accessible-tap rounded-xl p-2 voice-subtle transition-all hover:bg-[#2e281d] hover:voice-text active:scale-[0.97]"
               aria-label="Close voice assistant"
             >
               <X className="h-6 w-6" />
@@ -410,7 +409,7 @@ export const VoiceCommandOverlay: React.FC<VoiceCommandOverlayProps> = ({
             onClick={isListening ? stopListening : startListening}
             className={`flex h-24 w-24 items-center justify-center rounded-full shadow-xl transition-all active:scale-95 sm:h-28 sm:w-28 ${
               isListening
-                ? 'bg-brick text-on-brick ring-8 ring-[#a83a30]/40 animate-pulse'
+                ? 'bg-brick text-on-brick ring-8 ring-brick/40 animate-pulse'
                 : 'bg-pine text-on-pine hover:bg-pine-deep'
             }`}
             aria-label={isListening ? 'Stop listening' : 'Start listening'}
@@ -418,7 +417,7 @@ export const VoiceCommandOverlay: React.FC<VoiceCommandOverlayProps> = ({
             <Mic className={`h-10 w-10 ${isListening ? 'animate-bounce' : ''}`} />
           </button>
 
-          <div className="mt-4 text-lg font-bold text-[#f7f1e3] sm:text-xl">
+          <div className="mt-4 text-lg font-bold voice-text sm:text-xl">
             {isListening
               ? 'Listening... Speak naturally'
               : isProcessing
@@ -427,19 +426,19 @@ export const VoiceCommandOverlay: React.FC<VoiceCommandOverlayProps> = ({
           </div>
 
           {/* Engine Indicator */}
-          <div className="mt-1 flex items-center justify-center gap-2 text-sm text-[#b5ab97]">
+          <div className="mt-1 flex items-center justify-center gap-2 text-sm voice-subtle">
             <span className="inline-block h-2 w-2 animate-ping rounded-full bg-emerald-400" />
             <span>{engineStatus}</span>
           </div>
 
           {/* Live Transcript / Speech Stream */}
           {(transcript || interimTranscript) && (
-            <div className="mt-4 w-full max-w-lg rounded-xl border border-[#4a4232] bg-[#2e281d]/90 p-4 text-left">
-              <div className="mb-1 flex items-center justify-between text-xs font-bold tracking-wide text-[#b5ab97] uppercase">
+            <div className="mt-4 w-full max-w-lg voice-well p-4 text-left">
+              <div className="mb-1 flex items-center justify-between text-xs font-bold tracking-wide voice-subtle uppercase">
                 <span>Transcribed Voice:</span>
-                {isSpeechmaticsActive && <span className="text-[11px] font-bold text-[#d8cdb4]">Speechmatics Realtime</span>}
+                {isSpeechmaticsActive && <span className="text-[11px] font-bold voice-subtle">Speechmatics Realtime</span>}
               </div>
-              <p className="text-base font-bold italic text-[#f7f1e3] sm:text-lg">
+              <p className="text-base font-bold italic voice-text sm:text-lg">
                 “{transcript || interimTranscript}”
               </p>
             </div>
@@ -447,14 +446,14 @@ export const VoiceCommandOverlay: React.FC<VoiceCommandOverlayProps> = ({
 
           {/* Gemini AI Spoken Response Card */}
           {assistantResponse && (
-            <div className="mt-4 flex w-full max-w-lg items-start gap-3 rounded-xl border border-[#4a4232] bg-[#2e281d] p-4 text-left text-[#f1ead9] shadow-sm">
+            <div className="mt-4 flex w-full max-w-lg items-start gap-3 voice-well p-4 text-left shadow-sm">
               <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
               <div>
-                <div className="mb-1 flex items-center gap-1.5 text-xs font-bold tracking-wide text-[#b5ab97] uppercase">
+                <div className="mb-1 flex items-center gap-1.5 text-xs font-bold tracking-wide voice-subtle uppercase">
                   <Cpu className="h-4 w-4 text-sky-400" />
                   <span>Gemini Assistant Decision</span>
                   {recognizedAction && (
-                    <span className="ml-auto rounded-full bg-[#383123] px-2 py-0.5 text-[10px] font-bold text-[#d8cdb4]">
+                    <span className="ml-auto rounded-full bg-[#383123] px-2 py-0.5 text-[10px] font-bold voice-subtle">
                       {recognizedAction}
                     </span>
                   )}
@@ -468,35 +467,35 @@ export const VoiceCommandOverlay: React.FC<VoiceCommandOverlayProps> = ({
         </div>
 
         {/* Quick Speech Phrase Buttons */}
-        <div className="mt-6 border-t border-[#4a4232] pt-4">
-          <div className="mb-3 text-sm font-bold tracking-wide text-[#b5ab97] uppercase">
+        <div className="mt-6 border-t voice-divider pt-4">
+          <div className="mb-3 voice-label">
             Or tap a common Singapore senior phrase:
           </div>
           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
             <button
               onClick={() => handleProcessVoiceCommand('Where am I right now?')}
-              className="rounded-xl border border-[#5a5140] bg-[#2e281d]/80 p-3.5 text-left text-sm font-bold text-[#e8e0cd] transition-all hover:bg-[#383123] active:scale-[0.98] sm:text-base"
+              className="voice-btn"
             >
               🗣️ “Where am I right now?”
             </button>
 
             <button
               onClick={() => handleProcessVoiceCommand('Send my exact location to my daughter Sarah')}
-              className="rounded-xl border border-[#5a5140] bg-[#2e281d]/80 p-3.5 text-left text-sm font-bold text-[#e8e0cd] transition-all hover:bg-[#383123] active:scale-[0.98] sm:text-base"
+              className="voice-btn"
             >
               🗣️ “Send location to Sarah (Daughter)”
             </button>
 
             <button
               onClick={() => handleProcessVoiceCommand('Take a photo of where I am standing')}
-              className="rounded-xl border border-[#5a5140] bg-[#2e281d]/80 p-3.5 text-left text-sm font-bold text-[#e8e0cd] transition-all hover:bg-[#383123] active:scale-[0.98] sm:text-base"
+              className="voice-btn"
             >
               📷 “Take a photo of my surroundings”
             </button>
 
             <button
               onClick={() => handleProcessVoiceCommand('I need urgent Singapore SCDF 995 ambulance')}
-              className="rounded-xl border border-[#a83a30]/70 bg-[#3a201c] p-3.5 text-left text-sm font-bold text-[#f2c1ba] transition-all hover:bg-[#4a2721] active:scale-[0.98] sm:text-base"
+              className="voice-btn-danger"
             >
               🚨 “Emergency 995 SCDF Ambulance”
             </button>

@@ -96,7 +96,7 @@ export const LiveLocationCard: React.FC<LiveLocationCardProps> = ({
 
       {/* Indoor Detection Guidance */}
       {verification?.isIndoors && (
-        <div className="mb-5 rounded-xl border-2 border-amber-400 bg-amber-50 dark:bg-neutral-900 text-amber-950 dark:text-amber-200 p-4 space-y-1">
+        <div className="mb-5 rounded-xl border-2 border-amber-400 bg-ochre-soft text-ink p-4 space-y-1">
           <div className="flex items-center gap-2 font-extrabold text-sm sm:text-base">
             <span>🏠 INDOORS: {verification.indoorContext || 'Inside Building / Concourse'}</span>
           </div>

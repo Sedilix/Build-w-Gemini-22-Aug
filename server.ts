@@ -8,6 +8,7 @@ import express from 'express';
 import path from 'path';
 import { GoogleGenAI, Type } from '@google/genai';
 import { createServer as createViteServer } from 'vite';
+import { ringSamplePoints, bearingDegrees, withinFieldOfView, haversineMeters } from './src/utils/geo';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 9003;
@@ -443,60 +444,6 @@ async function fetchNearbyPlacesLandmarks(lat: number, lng: number): Promise<Arr
     console.warn('Places API (New) searchNearby error:', err);
   }
   return [];
-}
-
-// Helper: Compute route & driver ETA via Routes API
-async function computeDriverRoute(
-  originLat: number,
-  originLng: number,
-  destLat: number,
-  destLng: number
-): Promise<{ durationText: string; distanceText: string; durationSeconds: number; distanceMeters: number } | null> {
-  const mapsKey = getGoogleMapsApiKey();
-  if (!mapsKey) return null;
-
-  try {
-    const res = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Goog-Api-Key': mapsKey,
-        'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters,routes.legs',
-        'X-Goog-Maps-Solution-ID': 'gmp_mcp_codeassist_v1_aistudio',
-      },
-      body: JSON.stringify({
-        origin: {
-          location: { latLng: { latitude: originLat, longitude: originLng } },
-        },
-        destination: {
-          location: { latLng: { latitude: destLat, longitude: destLng } },
-        },
-        travelMode: 'DRIVE',
-        routingPreference: 'TRAFFIC_AWARE',
-      }),
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      if (data.routes && data.routes.length > 0) {
-        const route = data.routes[0];
-        const durationSeconds = parseInt(route.duration?.replace('s', '') || '0', 10);
-        const distanceMeters = route.distanceMeters || 0;
-        const mins = Math.max(1, Math.round(durationSeconds / 60));
-        const miles = (distanceMeters * 0.000621371).toFixed(1);
-
-        return {
-          durationText: `${mins} min${mins === 1 ? '' : 's'}`,
-          distanceText: `${miles} miles (${(distanceMeters / 1000).toFixed(1)} km)`,
-          durationSeconds,
-          distanceMeters,
-        };
-      }
-    }
-  } catch (err) {
-    console.warn('Routes API computeRoutes error:', err);
-  }
-  return null;
 }
 
 // ============================================================================
@@ -1010,6 +957,103 @@ app.get('/api/places/autocomplete', async (req, res) => {
   return res.json({ suggestions: results.slice(0, 8) });
 });
 
+// ── Phase 2: Street View candidate retrieval inside the GPS accuracy box ──
+
+interface StreetViewCandidate {
+  label: string;
+  panoId: string;
+  lat: number;
+  lng: number;
+  distanceMeters: number;
+  bearingDeg: number;
+  imageUrl: string;
+  imageBase64?: string | null;
+}
+
+async function fetchStreetViewMetadata(lat: number, lng: number, mapsKey: string): Promise<any | null> {
+  try {
+    const url = `https://maps.googleapis.com/maps/api/streetview/metadata?location=${lat},${lng}&key=${mapsKey}`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.status === 'OK' ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchImageBase64(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url);
+    const contentType = res.headers.get('content-type') || '';
+    if (!res.ok || !contentType.startsWith('image/')) return null;
+    const buf = await res.arrayBuffer();
+    return Buffer.from(buf).toString('base64');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Sample the accuracy bounding box, snap each probe to its nearest panorama
+ * via the Street View Metadata API, discard panoramas outside the camera
+ * field of view, and download the three nearest as heading-oriented frames.
+ */
+async function retrieveStreetViewCandidates(opts: {
+  lat: number;
+  lng: number;
+  accuracy: number;
+  deviceHeading: number | null;
+  mapsKey: string;
+}): Promise<StreetViewCandidate[]> {
+  // Clamp the probe radius: below 15m nothing new is found, above 60m the
+  // ring starts landing on the next street over.
+  const radius = Math.min(Math.max(opts.accuracy || 20, 15), 60);
+  const user = { lat: opts.lat, lng: opts.lng };
+  const samplePoints = ringSamplePoints(user, radius, 8);
+
+  const metas = await Promise.all(
+    samplePoints.map((p) => fetchStreetViewMetadata(p.lat, p.lng, opts.mapsKey))
+  );
+
+  const byPano = new Map<string, { lat: number; lng: number }>();
+  for (const m of metas) {
+    if (m?.pano_id && m.location && !byPano.has(m.pano_id)) {
+      byPano.set(m.pano_id, { lat: m.location.lat, lng: m.location.lng });
+    }
+  }
+
+  let candidates = [...byPano.entries()].map(([panoId, loc]) => ({
+    panoId,
+    lat: loc.lat,
+    lng: loc.lng,
+    distanceMeters: Math.round(haversineMeters(user, loc)),
+    bearingDeg: Math.round(bearingDegrees(user, loc)),
+  }));
+
+  // A panorama behind the senior can never appear in their photo.
+  if (opts.deviceHeading != null) {
+    candidates = candidates.filter((c) => withinFieldOfView(c.bearingDeg, opts.deviceHeading as number, 90));
+  }
+
+  candidates.sort((a, b) => a.distanceMeters - b.distanceMeters);
+
+  const renderHeading = Math.round(opts.deviceHeading ?? candidates[0]?.bearingDeg ?? 0);
+  const labels = ['A', 'B', 'C'];
+  const top: StreetViewCandidate[] = candidates.slice(0, 3).map((c, i) => ({
+    ...c,
+    label: labels[i],
+    imageUrl: `https://maps.googleapis.com/maps/api/streetview?size=600x400&location=${c.lat},${c.lng}&heading=${renderHeading}&pitch=0&fov=90&key=${opts.mapsKey}`,
+  }));
+
+  await Promise.all(
+    top.map(async (c) => {
+      c.imageBase64 = await fetchImageBase64(c.imageUrl);
+    })
+  );
+  return top.filter((c) => Boolean(c.imageBase64));
+}
+
 // API endpoint: Multimodal Location Verification & Landmark Cross-Referencing
 app.post('/api/gemini/analyze-location', async (req, res) => {
   try {
@@ -1019,8 +1063,8 @@ app.post('/api/gemini/analyze-location', async (req, res) => {
       photoMimeType = 'image/jpeg',
       voiceNotes = '',
       manualClues = '',
-      contextPreset,
       bleBeacons = [],
+      sensor,
     } = req.body;
 
     if (!gps || typeof gps.latitude !== 'number' || typeof gps.longitude !== 'number') {
@@ -1028,6 +1072,11 @@ app.post('/api/gemini/analyze-location', async (req, res) => {
     }
 
     const { latitude, longitude, accuracy = 20, heading = 0, speed = 0, altitude = 0 } = gps;
+
+    // Phase 1: the shutter-time compass heading beats the GNSS course, which
+    // is usually null on phones. It orients the whole candidate retrieval.
+    const deviceHeading =
+      sensor && typeof sensor.heading === 'number' ? sensor.heading : heading || null;
 
     // Execute Roads API snap & Places API search in parallel with reverse geocoding
     const [approximateAddress, snappedRoad, nearbyPlaces] = await Promise.all([
@@ -1041,8 +1090,24 @@ app.post('/api/gemini/analyze-location', async (req, res) => {
 
     const mapsKey = getGoogleMapsApiKey();
     const staticStreetViewUrl = mapsKey
-      ? `https://maps.googleapis.com/maps/api/streetview?size=600x400&location=${effectiveLat},${effectiveLng}&heading=${heading || 0}&pitch=0&fov=90&key=${mapsKey}`
-      : `https://maps.googleapis.com/maps/api/streetview?size=600x400&location=${effectiveLat},${effectiveLng}&heading=${heading || 0}&pitch=0&fov=90&client=aistudio-agent`;
+      ? `https://maps.googleapis.com/maps/api/streetview?size=600x400&location=${effectiveLat},${effectiveLng}&heading=${deviceHeading ?? 0}&pitch=0&fov=90&key=${mapsKey}`
+      : `https://maps.googleapis.com/maps/api/streetview?size=600x400&location=${effectiveLat},${effectiveLng}&heading=${deviceHeading ?? 0}&pitch=0&fov=90&client=aistudio-agent`;
+
+    // Phase 2: probe the GPS accuracy bounding box for Street View panoramas,
+    // keep only the ones inside the camera field of view at shutter time, and
+    // download up to three reference frames so Gemini can actually see them.
+    const candidates: StreetViewCandidate[] = mapsKey
+      ? await retrieveStreetViewCandidates({
+          lat: latitude,
+          lng: longitude,
+          accuracy,
+          deviceHeading,
+          mapsKey,
+        }).catch((e) => {
+          console.warn('Street View candidate retrieval failed:', e?.message || e);
+          return [] as StreetViewCandidate[];
+        })
+      : [];
 
     const ai = getGeminiClient();
 
@@ -1094,13 +1159,17 @@ app.post('/api/gemini/analyze-location', async (req, res) => {
         safeWaitingAdvice: 'Please remain at the sheltered sidewalk or bench in clear sight of arriving vehicles.',
         streetViewData: {
           available: true,
-          heading: heading || 0,
+          heading: deviceHeading ?? 0,
           pitch: 0,
           fov: 90,
           streetViewImageUrl: staticStreetViewUrl,
           comparisonSummary: 'Visual coordinates align with street level orientation.',
           matchingFeatures: ['Curbside walkway', 'Building façade boundary', ...nearbyPlaces.slice(0, 2).map(p => p.name)],
         },
+        sensor: sensor || null,
+        candidatePanoramas: candidates.map(({ label, panoId, lat, lng, distanceMeters, bearingDeg }) => ({ label, panoId, lat, lng, distanceMeters, bearingDeg })),
+        matchedCandidate: null,
+        refinedByCandidate: false,
         shareUrls: {
           googleMapsUrl,
           appleMapsUrl,
@@ -1128,14 +1197,33 @@ app.post('/api/gemini/analyze-location', async (req, res) => {
     // Only beacons at surveyed positions can refine the pin. A detected but
     // unregistered device is real radio traffic that says nothing about where
     // the senior is standing, so it must not be offered as location evidence.
+    // 'geofence' entries are GPS-proximity hints, not radio measurements.
     const venueBeacons = (bleBeacons || []).filter((b: any) => b.isKnownVenue);
+    const radioBeacons = venueBeacons.filter((b: any) => b.source !== 'geofence');
+    const geofenceBeacons = venueBeacons.filter((b: any) => b.source === 'geofence');
     const pairedTag = (bleBeacons || []).find((b: any) => b.isPairedTag);
 
-    const bleContext = venueBeacons.length > 0
-      ? `BLE Micro-Location Beacons in Range (measured over the air, surveyed positions): ${venueBeacons
+    const bleParts: string[] = [];
+    if (radioBeacons.length > 0) {
+      bleParts.push(
+        `BLE Micro-Location Beacons in Range (measured over the air, surveyed positions): ${radioBeacons
           .map((b: any) => `${b.name} at ${b.locationName} (RSSI ${b.rssi} dBm, estimated ${b.estimatedDistanceMeters}m away${b.floorLevel ? `, floor: ${b.floorLevel}` : ''})`)
           .join('; ')}. Distances are estimated from radio signal strength and degrade badly through walls and crowds, so treat them as supporting evidence for the photo and Places data, not as ground truth that overrides them.`
-      : `No registered venue BLE beacon detected in range${pairedTag ? `, though the senior's own paired safety tag is nearby (RSSI ${pairedTag.rssi} dBm)` : ''}. Rely on GPS, the photo, and Places API only — do not infer a beacon-based position.`;
+      );
+    }
+    if (geofenceBeacons.length > 0) {
+      bleParts.push(
+        `GPS-matched surveyed venues nearby (no Bluetooth radio signal - the phone matched these venues by GPS proximity only, so their distances are GPS estimates, NOT beacon measurements): ${geofenceBeacons
+          .map((b: any) => `${b.name} at ${b.locationName} (about ${b.estimatedDistanceMeters}m from the GPS fix${b.floorLevel ? `, floor: ${b.floorLevel}` : ''})`)
+          .join('; ')}. Useful as a hint about which venue the senior is near; never use them to override GPS or the photo.`
+      );
+    }
+    if (bleParts.length === 0) {
+      bleParts.push(
+        `No registered venue BLE beacon detected in range${pairedTag ? `, though the senior's own paired safety tag is nearby (RSSI ${pairedTag.rssi} dBm)` : ''}. Rely on GPS, the photo, and Places API only — do not infer a beacon-based position.`
+      );
+    }
+    const bleContext = bleParts.join(' ');
 
     const promptText = `
 You are an expert AI Location Specialist and Elder Pickup Assistant for Singapore and worldwide locations.
@@ -1146,9 +1234,11 @@ Google Maps Platform Multi-API & BLE Grounding:
 - ${roadsContext}
 - ${placesContext}
 - ${bleContext}
+- Shutter Sensor Metadata (Phase 1): compass heading ${deviceHeading != null ? `${Math.round(deviceHeading)} degrees` : 'unavailable'}, pitch ${sensor?.pitch ?? 'n/a'} deg, roll ${sensor?.roll ?? 'n/a'} deg, vertical accuracy ${gps.altitudeAccuracy ?? 'n/a'} m
 - Reverse Geocoded Address Hint: ${approximateAddress || 'Not available'}
 - User Voice Notes / Speech: "${voiceNotes || 'None'}"
-- Additional Clues / Environment: "${manualClues || (contextPreset?.landmarkHint ?? 'None')}"
+- Additional Clues / Environment: "${manualClues || 'None'}"
+- Phase 2 Candidate Panoramas: ${candidates.length > 0 ? candidates.map((c) => `Frame ${c.label} (${c.distanceMeters}m from GPS, bearing ${c.bearingDeg} deg)`).join('; ') : 'none retrieved - rely on GPS, Places and the photo alone'}
 
 TASK:
 1. Analyze the user's uploaded surroundings photo (if provided) along with the Roads API snapped curbside, Places API verified landmark list, and detected BLE Beacon micro-location signatures.
@@ -1162,6 +1252,7 @@ TASK:
 9. Create a warm, calming, simple voice summary for the elderly user (written in short, easy-to-hear sentences without technical jargon, mentioning if they need to step out to the pickup bay).
 10. Create safe waiting advice (e.g., "Stay under the sheltered walkway or bench. It is safe, dry, and brightly visible from the road.").
 11. Provide matching assessment for Google Street View comparison.
+12. Visual consensus (Phase 3): compare the user's photo against reference frames A/B/C along the device heading vector - match structural features (storefront rows, awnings, poles, foliage, building edges, perspective lines). Answer matchedCandidate with the letter of the frame showing the same scene, or NONE when nothing matches. When GPS drift is likely (urban canyon, accuracy worse than 15m) and a frame clearly matches, prefer that panorama's coordinates for verifiedLat/verifiedLng.
 
 Output your answer strictly using the provided JSON schema.`;
 
@@ -1176,6 +1267,14 @@ Output your answer strictly using the provided JSON schema.`;
           data: cleanBase64,
         },
       });
+    }
+
+    // Phase 3: attach the heading-oriented reference frames for consensus matching.
+    for (const c of candidates) {
+      parts.push({
+        text: `Reference frame ${c.label}: Street View panorama ${c.panoId}, ${c.distanceMeters}m from the user's GPS at bearing ${c.bearingDeg} deg, rendered facing the device compass heading.`,
+      });
+      parts.push({ inlineData: { mimeType: 'image/jpeg', data: c.imageBase64 as string } });
     }
 
     parts.push({ text: promptText });
@@ -1238,6 +1337,11 @@ Output your answer strictly using the provided JSON schema.`;
             type: Type.STRING,
             description: 'Clear safety recommendation for waiting safely',
           },
+          matchedCandidate: {
+            type: Type.STRING,
+            enum: ['A', 'B', 'C', 'NONE'],
+            description: 'Letter of the reference frame showing the same scene as the user photo, or NONE',
+          },
           streetViewComparison: {
             type: Type.OBJECT,
             properties: {
@@ -1297,8 +1401,11 @@ Output your answer strictly using the provided JSON schema.`;
 
     const parsed = JSON.parse(response.text?.trim() || '{}');
 
-    const verifiedLat = parsed.verifiedLat || latitude;
-    const verifiedLng = parsed.verifiedLng || longitude;
+    // Phase 3 consensus: a matched panorama is surveyed street geometry, so
+    // it overrides a drifting GPS fix in urban canyons.
+    const matchedCandidate = candidates.find((c) => c.label === parsed.matchedCandidate) || null;
+    const verifiedLat = matchedCandidate ? matchedCandidate.lat : parsed.verifiedLat || latitude;
+    const verifiedLng = matchedCandidate ? matchedCandidate.lng : parsed.verifiedLng || longitude;
     const formattedAddress = parsed.formattedAddress || approximateAddress || `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
 
     const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${verifiedLat},${verifiedLng}`;
@@ -1331,14 +1438,19 @@ Output your answer strictly using the provided JSON schema.`;
       indoorContext: parsed.indoorContext || (parsed.isIndoors ? 'Inside building/concourse' : 'Outdoor street area'),
       indoorExitGuidance: parsed.indoorExitGuidance || (parsed.isIndoors ? 'Please step towards the nearest ground floor entrance or taxi stand.' : 'Wait safely at the curbside.'),
       bleBeacons: bleBeacons || [],
-      // Only a surveyed beacon close enough to trust actually improves the pin.
-      bleAccuracyBoost: venueBeacons.some((b: any) => b.rssi >= -70 && b.estimatedDistanceMeters <= 3),
+      // Only a surveyed beacon actually heard over the air, close enough to
+      // trust, improves the pin. GPS-matched geofence hints never qualify.
+      bleAccuracyBoost: radioBeacons.some((b: any) => b.rssi >= -70 && b.estimatedDistanceMeters <= 3),
+      sensor: sensor || null,
+      candidatePanoramas: candidates.map(({ label, panoId, lat, lng, distanceMeters, bearingDeg }) => ({ label, panoId, lat, lng, distanceMeters, bearingDeg })),
+      matchedCandidate: matchedCandidate?.label || null,
+      refinedByCandidate: Boolean(matchedCandidate),
       pickupInstructionsForDriver: parsed.pickupInstructionsForDriver || 'Please pull up to the exact pin location.',
       elderlyVoiceSummary: parsed.elderlyVoiceSummary || `You are at ${formattedAddress}. Your location is verified.`,
       safeWaitingAdvice: parsed.safeWaitingAdvice || 'Stay where you are in a visible and comfortable spot.',
       streetViewData: {
         available: parsed.streetViewComparison?.available ?? true,
-        heading: parsed.streetViewComparison?.heading ?? (heading || 0),
+        heading: parsed.streetViewComparison?.heading ?? (deviceHeading ?? 0),
         pitch: parsed.streetViewComparison?.pitch ?? 0,
         fov: parsed.streetViewComparison?.fov ?? 90,
         streetViewImageUrl: staticStreetViewUrl,
@@ -1531,57 +1643,6 @@ Instructions for generation:
       feedbackMessage: 'Ready to assist.',
       confidence: 70,
     });
-  }
-});
-
-// API endpoint: Compute driver ETA & Distance via Routes API
-app.post('/api/maps/compute-driver-route', async (req, res) => {
-  try {
-    const { originLat, originLng, destLat, destLng } = req.body;
-    if (
-      typeof originLat !== 'number' ||
-      typeof originLng !== 'number' ||
-      typeof destLat !== 'number' ||
-      typeof destLng !== 'number'
-    ) {
-      return res.status(400).json({ error: 'Valid originLat, originLng, destLat, and destLng required.' });
-    }
-
-    const routeData = await computeDriverRoute(originLat, originLng, destLat, destLng);
-    if (routeData) {
-      return res.json({
-        success: true,
-        source: 'Google Routes API',
-        ...routeData,
-      });
-    }
-
-    // Fallback calculation (Haversine formula + average speed 30km/h)
-    const R = 6371; // km
-    const dLat = ((destLat - originLat) * Math.PI) / 180;
-    const dLon = ((destLng - originLng) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((originLat * Math.PI) / 180) *
-        Math.cos((destLat * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const distKm = R * c;
-    const driveMinutes = Math.max(2, Math.round((distKm / 35) * 60));
-    const miles = (distKm * 0.621371).toFixed(1);
-
-    return res.json({
-      success: true,
-      source: 'Internal Telemetry Estimator',
-      durationText: `${driveMinutes} mins`,
-      distanceText: `${miles} miles (${distKm.toFixed(1)} km)`,
-      durationSeconds: driveMinutes * 60,
-      distanceMeters: Math.round(distKm * 1000),
-    });
-  } catch (error: any) {
-    console.error('Error in /api/maps/compute-driver-route:', error);
-    return res.status(500).json({ error: 'Failed to compute driver route', details: error.message });
   }
 });
 

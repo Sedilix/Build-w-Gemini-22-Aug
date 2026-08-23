@@ -163,7 +163,7 @@ export const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> =
   // Icon for category
   const renderCategoryIcon = () => {
     if (category === 'home') return <Home className="h-5 w-5 text-pine" />;
-    if (category === 'work') return <Briefcase className="h-5 w-5 text-sky-600" />;
+    if (category === 'work') return <Briefcase className="h-5 w-5 text-sky" />;
     if (category === 'healthcare') return <Hospital className="h-5 w-5 text-brick" />;
     return <MapPin className="h-5 w-5 text-pine" />;
   };
@@ -174,7 +174,7 @@ export const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> =
       return <Hospital className="h-5 w-5 text-brick shrink-0 mt-0.5" />;
     }
     if (s.category === 'work' || s.title.toLowerCase().includes('block71') || s.title.toLowerCase().includes('tower')) {
-      return <Building2 className="h-5 w-5 text-sky-600 shrink-0 mt-0.5" />;
+      return <Building2 className="h-5 w-5 text-sky shrink-0 mt-0.5" />;
     }
     if (s.category === 'home' || s.title.toLowerCase().startsWith('blk')) {
       return <Home className="h-5 w-5 text-pine shrink-0 mt-0.5" />;

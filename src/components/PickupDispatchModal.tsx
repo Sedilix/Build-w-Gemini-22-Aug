@@ -187,8 +187,8 @@ export const PickupDispatchModal: React.FC<PickupDispatchModalProps> = ({
               {verification.confidenceScore}% Verified
             </span>
             {verification.bleAccuracyBoost && verification.bleBeacons?.[0] && (
-              <span className="chip border-sky-400 bg-sky-50 text-sky-900 text-xs font-bold">
-                <Radio className="h-3.5 w-3.5 text-sky-600 animate-pulse" />
+              <span className="chip border-sky-400 bg-sky-soft text-sky text-xs font-bold">
+                <Radio className="h-3.5 w-3.5 text-sky animate-pulse" />
                 BLE: {verification.bleBeacons[0].locationName} (±{verification.bleBeacons[0].estimatedDistanceMeters}m)
               </span>
             )}

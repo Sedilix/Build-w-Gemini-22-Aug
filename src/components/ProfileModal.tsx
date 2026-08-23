@@ -15,7 +15,6 @@ import {
   ShieldCheck, 
   Check, 
   RefreshCw, 
-  Upload, 
   LogOut, 
   AlertCircle,
   FileText
@@ -57,7 +56,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   // Camera State
   const [isCameraActive, setIsCameraActive] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Saving State
   const [isSaving, setIsSaving] = useState(false);
@@ -101,11 +99,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         videoRef.current.play();
       }
     } catch (err) {
-      console.warn('Cannot open user selfie camera, falling back to file input:', err);
+      console.warn('Cannot open user selfie camera:', err);
       setIsCameraActive(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.click();
-      }
+      setErrorMessage(
+        'Live camera is unavailable here, so no photo was taken. Gallery uploads are disabled to keep your photo authentic — try again from your phone.'
+      );
     }
   };
 
@@ -136,20 +134,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       const base64 = canvas.toDataURL('image/jpeg', 0.85);
       setSelfiePhotoUrl(base64);
       stopCamera();
-    }
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const base64 = event.target?.result as string;
-        if (base64) {
-          setSelfiePhotoUrl(base64);
-        }
-      };
-      reader.readAsDataURL(file);
     }
   };
 
@@ -318,33 +302,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                     </button>
                   </>
                 ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={startCamera}
-                      className="btn btn-md btn-primary"
-                    >
-                      <Camera className="h-5 w-5" />
-                      <span>{selfiePhotoUrl ? 'Retake Selfie' : 'Take Selfie Photo'}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="btn btn-md btn-secondary"
-                    >
-                      <Upload className="h-4 w-4" />
-                      <span>Upload</span>
-                    </button>
-
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                    />
-                  </>
+                  <button
+                    type="button"
+                    onClick={startCamera}
+                    className="btn btn-md btn-primary"
+                  >
+                    <Camera className="h-5 w-5" />
+                    <span>{selfiePhotoUrl ? 'Retake Selfie' : 'Take Selfie Photo'}</span>
+                  </button>
                 )}
               </div>
             </div>

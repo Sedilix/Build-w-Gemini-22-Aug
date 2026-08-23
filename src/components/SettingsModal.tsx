@@ -33,7 +33,6 @@ interface SettingsModalProps {
   settings: AccessibilitySettings;
   onUpdateSettings: (updater: (prev: AccessibilitySettings) => AccessibilitySettings) => void;
   onOpenManageContacts?: () => void;
-  onSimulateImpact?: (type: 'crash' | 'fall') => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -42,7 +41,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   settings,
   onUpdateSettings,
   onOpenManageContacts,
-  onSimulateImpact,
 }) => {
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
 
@@ -385,7 +383,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 onClick={() => onUpdateSettings((prev) => ({ ...prev, crashDetection: !(prev.crashDetection ?? true) }))}
                 className={`p-3.5 rounded-xl border text-left flex items-start justify-between gap-3 transition-all ${
                   (settings.crashDetection ?? true)
-                    ? 'border-brick/50 bg-brick/5 text-ink'
+                    ? 'border-brick/40 bg-brick-soft text-ink'
                     : 'border-line bg-surface text-ink-soft'
                 }`}
               >
@@ -412,7 +410,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 onClick={() => onUpdateSettings((prev) => ({ ...prev, fallDetection: !(prev.fallDetection ?? true) }))}
                 className={`p-3.5 rounded-xl border text-left flex items-start justify-between gap-3 transition-all ${
                   (settings.fallDetection ?? true)
-                    ? 'border-ochre/50 bg-ochre/5 text-ink'
+                    ? 'border-ochre/40 bg-ochre-soft text-ink'
                     : 'border-line bg-surface text-ink-soft'
                 }`}
               >
@@ -433,33 +431,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               </button>
             </div>
-
-            {/* Test Crash & Fall Simulator Buttons */}
-            {onSimulateImpact && (
-              <div className="pt-1 flex flex-wrap items-center gap-2">
-                <span className="text-xs font-semibold text-ink-soft">Test Emergency Response:</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    onSimulateImpact('crash');
-                  }}
-                  className="accessible-tap px-3 py-1.5 rounded-lg text-xs font-bold bg-brick/10 hover:bg-brick/20 text-brick-deep border border-brick/30 flex items-center gap-1.5 transition-colors"
-                >
-                  <span>🧪 Test Crash (4.2G @ 52 km/h)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    onSimulateImpact('fall');
-                  }}
-                  className="accessible-tap px-3 py-1.5 rounded-lg text-xs font-bold bg-ochre/10 hover:bg-ochre/20 text-ochre-deep border border-ochre/30 flex items-center gap-1.5 transition-colors"
-                >
-                  <span>🧪 Test Slip & Fall (2.4G)</span>
-                </button>
-              </div>
-            )}
           </section>
 
           {/* Section 6: Emergency Contacts & Diagnostics */}

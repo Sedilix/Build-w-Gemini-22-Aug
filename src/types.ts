@@ -10,7 +10,21 @@ export interface GPSLocation {
   heading: number | null;
   speed: number | null;
   altitude: number | null;
+  /** Vertical accuracy radius in metres, when the GNSS chip reports one. */
+  altitudeAccuracy?: number | null;
   timestamp: number;
+}
+
+/**
+ * Phase 1 shutter-time sensor payload: compass heading + pitch + roll frozen
+ * at the exact millisecond the photo is taken. Barometer pressure and focal
+ * length are native-only and deliberately absent on the web platform.
+ */
+export interface SensorMetadata {
+  heading: number | null;
+  pitch: number | null;
+  roll: number | null;
+  capturedAt: number;
 }
 
 export interface LandmarkFeature {
@@ -77,6 +91,21 @@ export interface LocationVerificationResult {
   };
   timestamp: number;
   photoUrl?: string;
+  /** Shutter-time sensor payload that oriented the candidate retrieval. */
+  sensor?: SensorMetadata | null;
+  /** Phase 2 Street View panoramas retrieved inside the accuracy bounding box. */
+  candidatePanoramas?: Array<{
+    label: string; // 'A' | 'B' | 'C'
+    panoId: string;
+    lat: number;
+    lng: number;
+    distanceMeters: number;
+    bearingDeg: number;
+  }>;
+  /** Label of the panorama Gemini visually matched to the senior's photo. */
+  matchedCandidate?: string | null;
+  /** True when verifiedCoordinates came from a matched panorama, not raw GPS. */
+  refinedByCandidate?: boolean;
 }
 
 /** A beacon actually heard on the radio during a Web Bluetooth scan. */
@@ -98,6 +127,12 @@ export interface BLEBeaconScan {
   batteryPercent?: number;
   /** Advertisement format this was decoded from. */
   format: 'ibeacon' | 'eddystone' | 'generic';
+  /**
+   * Where this reading came from. 'radio' = a real advertisement measured
+   * over the air; 'geofence' = a surveyed venue matched by GPS proximity,
+   * whose distance is a GPS estimate, never a radio measurement.
+   */
+  source?: 'radio' | 'geofence';
   /** True only when the beacon's id matches a surveyed venue in the registry. */
   isKnownVenue: boolean;
   /** True when this is the senior's own paired safety pendant. */
@@ -136,9 +171,9 @@ export interface EmergencyContact {
 export type BloodType = 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-' | 'Unknown';
 
 /**
- * The places a senior actually travels between, set once in their profile and
- * offered as one-tap destinations. These replace demo location presets: a
- * senior needs their own home and clinic, not a sample landmark.
+ * The places a senior actually travels between, set once in their profile
+ * and offered as one-tap destinations — their own home and clinic, never a
+ * pre-filled landmark.
  */
 export type SavedPlaceKind = 'home' | 'work' | 'healthcare';
 
@@ -268,18 +303,6 @@ export interface AccessibilitySettings {
   language: Language; // UI + voice readout language (default 'en')
   fallDetection?: boolean; // Passive accelerometer fall monitoring
   crashDetection?: boolean; // High-G vehicle crash impact detection (iOS / Android)
-}
-
-export interface LocationPreset {
-  id: string;
-  title: string;
-  subtitle: string;
-  description: string;
-  lat: number;
-  lng: number;
-  accuracy: number;
-  sampleImageUrl: string;
-  landmarkHint: string;
 }
 
 /**

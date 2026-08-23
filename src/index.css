@@ -29,6 +29,7 @@
   --color-on-pine: var(--ss-on-pine);
   --color-ochre: var(--ss-ochre);
   --color-ochre-soft: var(--ss-ochre-soft);
+  --color-ochre-deep: var(--ss-ochre-deep);
   --color-brick: var(--ss-brick);
   --color-brick-deep: var(--ss-brick-deep);
   --color-brick-soft: var(--ss-brick-soft);
@@ -53,6 +54,7 @@
   --ss-on-pine: #f6f4ec;
   --ss-ochre: #86611d;
   --ss-ochre-soft: #f3e8cf;
+  --ss-ochre-deep: #6b4d16;
   --ss-brick: #a83a30;
   --ss-brick-deep: #8a2d25;
   --ss-brick-soft: #f5e2de;
@@ -77,6 +79,7 @@ body.theme-yellow-black {
   --ss-on-pine: #000000;
   --ss-ochre: #ffd44d;
   --ss-ochre-soft: #251d04;
+  --ss-ochre-deep: #ffe083;
   --ss-brick: #ffd44d;
   --ss-brick-deep: #ffe083;
   --ss-brick-soft: #251d04;
@@ -101,6 +104,7 @@ body.theme-black-white {
   --ss-on-pine: #ffffff;
   --ss-ochre: #000000;
   --ss-ochre-soft: #e6e6e6;
+  --ss-ochre-deep: #262626;
   --ss-brick: #000000;
   --ss-brick-deep: #262626;
   --ss-brick-soft: #e6e6e6;
@@ -125,6 +129,7 @@ body.theme-warm-soft {
   --ss-on-pine: #fff9ec;
   --ss-ochre: #7a5a20;
   --ss-ochre-soft: #f0e6d0;
+  --ss-ochre-deep: #5e4318;
   --ss-brick: #9c4a3c;
   --ss-brick-deep: #7f3a2e;
   --ss-brick-soft: #f4e3dd;
@@ -164,19 +169,63 @@ body.theme-warm-soft {
 
 /* --- Components ------------------------------------------------------------- */
 @layer components {
+  /* ----- Keyframes -------------------------------------------------------- */
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes slide-up {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes pulse-subtle {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.7; }
+  }
+  @keyframes shimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  /* ----- Animation utilities ---------------------------------------------- */
+  .animate-in {
+    animation: fade-in 0.2s ease-out, slide-up 0.25s ease-out;
+  }
+  .animate-fade-in {
+    animation: fade-in 0.2s ease-out;
+  }
+
+  /* ----- Card -------------------------------------------------------------- */
   .card {
-    @apply rounded-2xl border border-line bg-surface;
+    @apply rounded-2xl border border-line bg-surface transition-all duration-200;
     box-shadow:
       0 1px 2px rgb(39 34 25 / 0.05),
       0 10px 28px -16px rgb(39 34 25 / 0.18);
   }
+  .card:hover {
+    box-shadow:
+      0 1px 3px rgb(39 34 25 / 0.08),
+      0 14px 36px -18px rgb(39 34 25 / 0.22);
+    transform: translateY(-1px);
+  }
 
+  /* ----- Buttons ----------------------------------------------------------- */
   .btn {
-    @apply inline-flex select-none items-center justify-center gap-2 rounded-xl font-body font-bold transition-all duration-150 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50;
+    @apply inline-flex select-none items-center justify-center gap-2 rounded-xl font-body font-bold transition-all duration-150;
+    cursor: pointer;
   }
   .btn:focus-visible {
-    outline: 3px solid var(--ss-pine);
-    outline-offset: 2px;
+    outline: none;
+    box-shadow: 0 0 0 3px var(--ss-pine-soft), 0 0 0 5px var(--ss-pine);
+  }
+  .btn:not(:disabled):hover {
+    transform: translateY(-1px);
+  }
+  .btn:not(:disabled):active {
+    transform: translateY(0) scale(0.97);
+  }
+  .btn:disabled {
+    @apply pointer-events-none opacity-50;
   }
 
   .btn-md {
@@ -187,34 +236,127 @@ body.theme-warm-soft {
   }
 
   .btn-primary {
-    @apply bg-pine text-on-pine shadow-sm hover:bg-pine-deep;
+    @apply bg-pine text-on-pine shadow-sm;
+    box-shadow: 0 2px 8px rgb(47 109 91 / 0.25);
   }
+  .btn-primary:not(:disabled):hover {
+    @apply bg-pine-deep;
+    box-shadow: 0 4px 14px rgb(47 109 91 / 0.35);
+  }
+  .btn-primary:not(:disabled):active {
+    box-shadow: 0 1px 4px rgb(47 109 91 / 0.2);
+  }
+
   .btn-secondary {
-    @apply border border-line-strong/70 bg-surface text-ink shadow-xs hover:bg-well;
+    @apply border border-line-strong/70 bg-surface text-ink shadow-xs;
   }
+  .btn-secondary:not(:disabled):hover {
+    @apply border-line-strong bg-well;
+  }
+
   .btn-danger {
-    @apply bg-brick text-on-brick shadow-sm hover:bg-brick-deep;
+    @apply bg-brick text-on-brick shadow-sm;
+    box-shadow: 0 2px 8px rgb(168 58 48 / 0.25);
   }
+  .btn-danger:not(:disabled):hover {
+    @apply bg-brick-deep;
+    box-shadow: 0 4px 14px rgb(168 58 48 / 0.35);
+  }
+  .btn-danger:not(:disabled):active {
+    box-shadow: 0 1px 4px rgb(168 58 48 / 0.2);
+  }
+
   .btn-soft {
-    @apply bg-pine-soft text-pine-deep hover:bg-line/60;
+    @apply bg-pine-soft text-pine-deep;
+  }
+  .btn-soft:not(:disabled):hover {
+    @apply bg-line/60;
   }
 
+  /* ----- Chip / Badge ------------------------------------------------------ */
   .chip {
-    @apply inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold;
+    @apply inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold transition-colors;
+  }
+  .chip:hover {
+    @apply bg-well;
   }
 
+  /* ----- Icon tile --------------------------------------------------------- */
   .icon-tile {
-    @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-pine text-on-pine;
+    @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-pine text-on-pine transition-all duration-150;
+  }
+  .icon-tile:hover {
+    filter: brightness(1.1);
   }
 
+  /* ----- Form elements ----------------------------------------------------- */
   .label {
     @apply mb-1.5 block text-sm font-bold text-ink-soft;
   }
 
   .input {
-    @apply w-full rounded-xl border border-line-strong/70 bg-surface px-4 py-3 text-base font-semibold text-ink transition-colors placeholder:font-normal placeholder:text-ink-faint focus:border-pine focus:ring-2 focus:ring-pine/30 focus:outline-none;
+    @apply w-full rounded-xl border border-line-strong/70 bg-surface px-4 py-3 text-base font-semibold text-ink transition-all duration-150 placeholder:font-normal placeholder:text-ink-faint;
+  }
+  .input:focus {
+    @apply border-pine outline-none;
+    box-shadow: 0 0 0 3px rgb(47 109 91 / 0.25);
+    transform: scale(1.01);
   }
 
+  /* ----- Toggle switch ----------------------------------------------------- */
+  .toggle-switch {
+    @apply relative inline-flex h-8 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200;
+  }
+  .toggle-switch:focus-visible {
+    box-shadow: 0 0 0 3px var(--ss-pine-soft), 0 0 0 5px var(--ss-pine);
+  }
+  .toggle-switch--on {
+    @apply bg-pine;
+  }
+  .toggle-switch--off {
+    @apply bg-line-strong;
+  }
+  .toggle-switch-knob {
+    @apply pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow-lg transition duration-200 ease-in-out;
+  }
+  .toggle-switch--on .toggle-switch-knob {
+    transform: translateX(1.5rem);
+  }
+
+  /* ----- Status dot -------------------------------------------------------- */
+  .status-dot {
+    @apply inline-block h-2.5 w-2.5 rounded-full;
+  }
+  .status-dot--active {
+    @apply bg-pine;
+    animation: pulse-subtle 2s ease-in-out infinite;
+  }
+  .status-dot--warning {
+    @apply bg-ochre;
+    animation: pulse-subtle 1.5s ease-in-out infinite;
+  }
+  .status-dot--danger {
+    @apply bg-brick;
+    animation: pulse-subtle 1s ease-in-out infinite;
+  }
+  .status-dot--idle {
+    @apply bg-ink-faint;
+  }
+
+  /* ----- Skeleton loading -------------------------------------------------- */
+  .skeleton {
+    @apply rounded-xl bg-well;
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgb(255 255 255 / 0.4) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+  }
+
+  /* ----- Modal ------------------------------------------------------------- */
   .modal-backdrop {
     @apply fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-ink/50 p-3 backdrop-blur-sm sm:p-5;
   }
@@ -223,6 +365,7 @@ body.theme-warm-soft {
     box-shadow:
       0 1px 2px rgb(39 34 25 / 0.05),
       0 10px 28px -16px rgb(39 34 25 / 0.18);
+    animation: fade-in 0.15s ease-out, slide-up 0.2s ease-out;
   }
   .modal-head {
     @apply flex shrink-0 items-center justify-between gap-3 border-b border-line bg-well/60 px-4 py-4 sm:px-5;
@@ -233,6 +376,60 @@ body.theme-warm-soft {
 
   .section-kicker {
     @apply text-xs font-bold tracking-wide text-ink-faint uppercase;
+  }
+
+  /* ----- Voice Command Overlay — always-dark immersive panel --------------- */
+  .voice-backdrop {
+    @apply fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md;
+  }
+  .voice-panel {
+    @apply w-full max-w-2xl rounded-2xl border border-[#4a4232] bg-[#241f16] p-6 text-[#f1ead9] shadow-2xl sm:p-8;
+    animation: fade-in 0.15s ease-out, slide-up 0.2s ease-out;
+  }
+  .voice-well {
+    @apply rounded-xl border border-[#4a4232] bg-[#2e281d];
+  }
+  .voice-divider {
+    @apply border-[#4a4232];
+  }
+  .voice-btn {
+    @apply rounded-xl border border-[#5a5140] bg-[#2e281d]/80 px-3.5 py-3 text-left text-sm font-bold text-[#e8e0cd] transition-all duration-150;
+  }
+  .voice-btn:not(:disabled):hover {
+    @apply bg-[#383123];
+  }
+  .voice-btn:not(:disabled):active {
+    transform: scale(0.98);
+  }
+  .voice-btn-danger {
+    @apply rounded-xl border border-[#a83a30]/70 bg-[#3a201c] px-3.5 py-3 text-left text-sm font-bold text-[#f2c1ba] transition-all duration-150;
+  }
+  .voice-btn-danger:not(:disabled):hover {
+    @apply bg-[#4a2721];
+  }
+  .voice-btn-danger:not(:disabled):active {
+    transform: scale(0.98);
+  }
+  .voice-label {
+    @apply text-sm font-bold tracking-wide text-[#b5ab97] uppercase;
+  }
+  .voice-text {
+    @apply text-[#f7f1e3];
+  }
+  .voice-subtle {
+    @apply text-[#b5ab97];
+  }
+  .voice-accent {
+    @apply text-emerald-400;
+  }
+  .voice-chip {
+    @apply inline-flex items-center gap-1 rounded-full border border-[#5a5140] bg-[#2e281d] px-2.5 py-0.5 text-xs font-bold text-[#d8cdb4];
+  }
+  .voice-mic {
+    @apply flex items-center justify-center rounded-full shadow-xl transition-all duration-150;
+  }
+  .voice-mic:not(:disabled):active {
+    transform: scale(0.95);
   }
 }
 
@@ -254,8 +451,8 @@ body.theme-warm-soft {
 
 /* --- Warm scrollbars --------------------------------------------------------- */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
 }
 ::-webkit-scrollbar-track {
   background: var(--ss-bg);

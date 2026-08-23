@@ -33,54 +33,28 @@ export const CaregiverPreviewModal: React.FC<CaregiverPreviewModalProps> = ({
   photoBase64,
   settings,
 }) => {
-  const [driverEta, setDriverEta] = useState<{ durationText: string; distanceText: string; source: string } | null>(null);
-  const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
   const [streetViewFailed, setStreetViewFailed] = useState(false);
+
+  // Fresh street-view attempt every time the preview opens.
+  useEffect(() => {
+    if (isOpen) setStreetViewFailed(false);
+  }, [isOpen, verification]);
 
   void settings;
 
-  const address = verification?.formattedAddress || '480 Lorong 6 Toa Payoh, Singapore 310480';
-  const lat = verification?.verifiedCoordinates?.lat ?? 1.3327;
-  const lng = verification?.verifiedCoordinates?.lng ?? 103.8479;
-  const googleMapsUrl = verification?.shareUrls?.googleMapsUrl || `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
-
-  useEffect(() => {
-    if (!isOpen || !verification) return;
-    setStreetViewFailed(false);
-
-    // Simulate driver starting ~2.5 miles away to compute realistic live driving ETA via Routes API
-    const driverOriginLat = lat + 0.024;
-    const driverOriginLng = lng - 0.028;
-
-    setIsCalculatingRoute(true);
-    fetch('/api/maps/compute-driver-route', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        originLat: driverOriginLat,
-        originLng: driverOriginLng,
-        destLat: lat,
-        destLng: lng,
-      }),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success) {
-          setDriverEta({
-            durationText: data.durationText,
-            distanceText: data.distanceText,
-            source: data.source,
-          });
-        }
-      })
-      .catch((err) => console.warn('Could not compute driver route:', err))
-      .finally(() => setIsCalculatingRoute(false));
-  }, [isOpen, verification, lat, lng]);
+  // No invented addresses or coordinates: everything shown comes from the
+  // actual verification result.
+  const coords = verification?.verifiedCoordinates ?? verification?.originalCoordinates ?? null;
+  const address = verification?.formattedAddress || 'Location not verified yet';
+  const googleMapsUrl = coords
+    ? verification?.shareUrls?.googleMapsUrl || `https://www.google.com/maps/search/?api=1&query=${coords.lat},${coords.lng}`
+    : null;
 
   if (!isOpen) return null;
 
-  const seniorSnapshot = photoBase64 || verification?.photoUrl || 'https://images.unsplash.com/photo-1576602976047-174e57a47881?auto=format&fit=crop&w=800&q=80';
-  const streetViewUrl = verification?.streetViewData?.streetViewImageUrl || 'https://images.unsplash.com/photo-1576602976047-174e57a47881?auto=format&fit=crop&w=800&q=80';
+  const seniorSnapshot = photoBase64 || verification?.photoUrl || null;
+  const streetViewUrl = verification?.streetViewData?.streetViewImageUrl || null;
+  const showStreetView = Boolean(streetViewUrl) && !streetViewFailed;
 
   return (
     <div id="modal-caregiver-preview" className="modal-backdrop">
@@ -108,7 +82,8 @@ export const CaregiverPreviewModal: React.FC<CaregiverPreviewModalProps> = ({
           </button>
         </div>
 
-        {/* Live Route & Driver ETA Box */}
+        {/* Honest ETA guidance: the real ETA comes from Google Maps using the
+            driver's own live position, never from an invented starting point */}
         <div className="border-pine/30 bg-pine-soft text-ink mb-5 flex items-center justify-between gap-3 rounded-xl border p-4">
           <div className="flex items-center gap-3">
             <div className="bg-pine text-on-pine flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
@@ -116,21 +91,15 @@ export const CaregiverPreviewModal: React.FC<CaregiverPreviewModalProps> = ({
             </div>
             <div>
               <div className="section-kicker text-pine-deep">
-                Estimated Driver Travel Time
+                Your Live Travel Time
               </div>
-              <div className="text-lg font-bold sm:text-xl">
-                {isCalculatingRoute ? (
-                  'Calculating live drive route...'
-                ) : driverEta ? (
-                  <span>{driverEta.durationText} • {driverEta.distanceText}</span>
-                ) : (
-                  '6 mins • 2.1 miles (Live Traffic)'
-                )}
+              <div className="text-base font-bold sm:text-lg">
+                Open Google Maps below for a traffic-aware ETA from your current location.
               </div>
             </div>
           </div>
           <span className="chip border-pine/40 bg-surface text-pine-deep">
-            Routes API
+            Google Maps
           </span>
         </div>
 
@@ -190,11 +159,18 @@ export const CaregiverPreviewModal: React.FC<CaregiverPreviewModalProps> = ({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {/* Senior Photo */}
             <div className="relative aspect-video overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-xs">
-              <img
-                src={seniorSnapshot}
-                alt="Senior Surroundings"
-                className="h-full w-full object-cover"
-              />
+              {seniorSnapshot ? (
+                <img
+                  src={seniorSnapshot}
+                  alt="Senior Surroundings"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-4 text-center text-xs font-semibold text-slate-300">
+                  <Camera className="h-6 w-6" />
+                  No live photo yet — captured when the senior taps “Pick Me Up Here!”
+                </div>
+              )}
               <div className="absolute top-2 left-2 rounded bg-black/75 px-2 py-0.5 text-xs font-bold text-white">
                 Senior's Live Photo
               </div>
@@ -202,20 +178,29 @@ export const CaregiverPreviewModal: React.FC<CaregiverPreviewModalProps> = ({
 
             {/* Street View / Satellite Reference */}
             <div className="relative aspect-video overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-xs">
-              <img
-                src={streetViewFailed ? 'https://images.unsplash.com/photo-1576602976047-174e57a47881?auto=format&fit=crop&w=800&q=80' : streetViewUrl}
-                alt="Google Street View Reference"
-                onError={() => setStreetViewFailed(true)}
-                className="h-full w-full object-cover"
-              />
+              {showStreetView ? (
+                <img
+                  src={streetViewUrl!}
+                  alt="Google Street View Reference"
+                  onError={() => setStreetViewFailed(true)}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-4 text-center text-xs font-semibold text-slate-300">
+                  <MapPin className="h-6 w-6" />
+                  Street View is not available at this spot.
+                </div>
+              )}
               <div className="absolute top-2 left-2 rounded bg-black/75 px-2 py-0.5 text-xs font-bold text-white">
                 Google Street View Reference
               </div>
-              <div className="absolute bottom-2 left-2 right-2 rounded bg-black/80 p-1.5 text-xs text-white">
-                <p className="truncate font-semibold text-emerald-400">
-                  ✓ {verification?.streetViewData?.comparisonSummary || 'Curbside features cross-referenced'}
-                </p>
-              </div>
+              {showStreetView && (
+                <div className="absolute bottom-2 left-2 right-2 rounded bg-black/80 p-1.5 text-xs text-white">
+                  <p className="truncate font-semibold text-emerald-400">
+                    ✓ {verification?.streetViewData?.comparisonSummary || 'Curbside features cross-referenced'}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -244,17 +229,24 @@ export const CaregiverPreviewModal: React.FC<CaregiverPreviewModalProps> = ({
 
         {/* Action Button: Start Navigation in Google Maps */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <a
-            id="btn-caregiver-start-nav"
-            href={googleMapsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn btn-lg btn-primary"
-          >
-            <Navigation className="h-5 w-5" />
-            <span>Open Google Maps Turn Navigation</span>
-            <ExternalLink className="h-4 w-4 opacity-60" />
-          </a>
+          {googleMapsUrl ? (
+            <a
+              id="btn-caregiver-start-nav"
+              href={googleMapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-lg btn-primary"
+            >
+              <Navigation className="h-5 w-5" />
+              <span>Open Google Maps Turn Navigation</span>
+              <ExternalLink className="h-4 w-4 opacity-60" />
+            </a>
+          ) : (
+            <button type="button" disabled className="btn btn-lg btn-primary opacity-50">
+              <Navigation className="h-5 w-5" />
+              <span>No verified location yet</span>
+            </button>
+          )}
 
           <button
             id="btn-caregiver-close-preview"

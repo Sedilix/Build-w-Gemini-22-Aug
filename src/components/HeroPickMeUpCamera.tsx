@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   Radio,
   Plus,
+  Compass,
 } from 'lucide-react';
 import {
   GPSLocation,
@@ -24,10 +25,19 @@ import {
   UserProfile,
   BLEBeaconScan,
   BLEScanState,
+  SensorMetadata,
 } from '../types';
 import { subscribeToBLE, startBeaconScan, stopBeaconScan, getNearbyBeacons, pairSafetyTag, getBLECapability } from '../utils/ble';
 import { orderSavedPlaces, savedPlaceLabel, SAVED_PLACE_META } from '../utils/places';
 import { formatConciseAddress, formatDriverHint } from '../utils/address';
+import {
+  ensureOrientationPermission,
+  getOrientationSnapshot,
+  isSteadyCapture,
+  startOrientationTracking,
+  stopOrientationTracking,
+  OrientationSnapshot,
+} from '../utils/orientation';
 
 /** Stop the camera after this long without the senior touching the screen. */
 const CAMERA_IDLE_TIMEOUT_MS = 60_000;
@@ -38,7 +48,7 @@ interface HeroPickMeUpCameraProps {
   isAnalyzing: boolean;
   isLoadingGPS: boolean;
   profile: UserProfile | null;
-  onPickMeUp: (photoBase64?: string, place?: SavedPlace) => void;
+  onPickMeUp: (photoBase64?: string, place?: SavedPlace, sensor?: SensorMetadata) => void;
   onSpeakAddress: () => void;
   onOpenProfile: () => void;
   isSpeaking: boolean;
@@ -64,6 +74,7 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
   const [bleState, setBleState] = useState<BLEScanState>({ status: 'idle', beaconCount: 0 });
   const [bleBeacons, setBleBeacons] = useState<BLEBeaconScan[]>([]);
   const [bleUnsupportedReason, setBleUnsupportedReason] = useState<string | null>(null);
+  const [liveOrientation, setLiveOrientation] = useState<OrientationSnapshot | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -159,6 +170,17 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
     };
   }, [stopCamera]);
 
+  // ── Orientation tracking (sensor lock strip + shutter metadata) ──────────
+
+  useEffect(() => {
+    startOrientationTracking();
+    const poll = setInterval(() => setLiveOrientation(getOrientationSnapshot()), 500);
+    return () => {
+      clearInterval(poll);
+      stopOrientationTracking();
+    };
+  }, []);
+
   // ── BLE ───────────────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -193,7 +215,12 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
 
   // ── Capture ───────────────────────────────────────────────────────────────
 
-  const handleSnapAndPickMeUp = () => {
+  const handleSnapAndPickMeUp = async () => {
+    // The tap is a user gesture — the only context iOS grants the compass
+    // from, so the shutter payload gets a real heading on iPhones.
+    await ensureOrientationPermission();
+    const sensor = getOrientationSnapshot();
+
     let photoData: string | undefined;
 
     if (videoRef.current && isLiveCameraActive) {
@@ -214,7 +241,7 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
       photoData = capturedPhoto;
     }
 
-    onPickMeUp(photoData);
+    onPickMeUp(photoData, undefined, sensor);
   };
 
   const conciseAddress = formatConciseAddress(verification?.formattedAddress);
@@ -225,10 +252,22 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
 
   return (
     <section id="hero-pick-me-up-section" className="card overflow-hidden">
-      {/* Status strip — compact on mobile, one line */}
+      {/* Status strip — sensor lock: compass heading, GPS accuracy, fix state */}
       <div className="border-line bg-well/70 flex items-center justify-between gap-2 border-b px-3 py-2 sm:px-4">
         <span className="section-kicker truncate">Point &amp; tap to be found</span>
-        <span className="text-ink-soft flex shrink-0 items-center gap-1.5 text-xs font-bold">
+        <span className="text-ink-soft flex shrink-0 items-center gap-2 text-xs font-bold">
+          <span className="flex items-center gap-1" title="Compass heading (sensor lock)">
+            <Compass className={`h-3.5 w-3.5 ${liveOrientation?.heading != null ? 'text-sky' : 'text-ink-faint'}`} />
+            {liveOrientation?.heading != null ? `${Math.round(liveOrientation.heading)}°` : '—'}
+          </span>
+          {gps && (
+            <span
+              className={gps.accuracy <= 15 ? 'text-pine-deep' : gps.accuracy <= 40 ? 'text-ochre-deep' : 'text-brick'}
+              title="GPS accuracy radius"
+            >
+              ±{Math.round(gps.accuracy)}m
+            </span>
+          )}
           <span
             className={`h-2 w-2 rounded-full ${gps ? 'bg-pine' : 'bg-ink-faint animate-pulse'}`}
           ></span>
@@ -296,6 +335,13 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
               <span className="absolute top-0 right-0 h-7 w-7 rounded-tr border-t-2 border-r-2 border-white/80"></span>
               <span className="absolute bottom-0 left-0 h-7 w-7 rounded-bl border-b-2 border-l-2 border-white/80"></span>
               <span className="absolute right-0 bottom-0 h-7 w-7 rounded-br border-r-2 border-b-2 border-white/80"></span>
+            </div>
+          )}
+
+          {/* Level hint — only when the frame would be visibly canted */}
+          {isLiveCameraActive && liveOrientation && !isSteadyCapture(liveOrientation) && (
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full border border-amber-300/40 bg-black/70 px-3 py-1 text-xs font-bold text-amber-300 backdrop-blur-sm">
+              Hold phone level
             </div>
           )}
 
@@ -408,8 +454,12 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
             />
             <span className={bleState.status === 'scanning' ? 'text-pine-deep' : 'text-ink-faint'}>
               {bleState.status === 'scanning'
-                ? `BLE Active • ${bleBeacons[0]?.locationName || 'Singapore Micro-Location'} (±1.8m)`
-                : 'Beacons off'}
+                ? bleBeacons[0]
+                  ? `${bleBeacons[0].source === 'geofence' ? 'Nearby venue (GPS-matched)' : 'BLE Active'} • ${bleBeacons[0].locationName} · ≈${bleBeacons[0].estimatedDistanceMeters}m`
+                  : 'Scanning for nearby beacons…'
+                : bleState.status === 'unavailable'
+                  ? 'Beacons unavailable here'
+                  : 'Beacons off'}
             </span>
           </div>
 
@@ -432,7 +482,9 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
                 <span className="truncate font-semibold">
                   {b.isPairedTag ? '🏷️' : b.isKnownVenue ? '📍' : '📶'} {b.locationName}
                 </span>
-                <span className="shrink-0 font-mono font-bold text-pine">≈{b.estimatedDistanceMeters}m (sub-3m boost)</span>
+                <span className="shrink-0 font-mono font-bold text-pine">
+                  ≈{b.estimatedDistanceMeters}m{b.source === 'geofence' ? ' (GPS)' : ''}
+                </span>
               </div>
             ))}
           </div>

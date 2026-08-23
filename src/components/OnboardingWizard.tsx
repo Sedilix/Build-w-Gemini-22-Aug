@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -87,7 +87,12 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const [newPhone, setNewPhone] = useState('');
   const [importNote, setImportNote] = useState<string | null>(null);
 
-  const photoInputRef = useRef<HTMLInputElement | null>(null);
+  // Live selfie capture only — gallery uploads are deliberately absent so the
+  // photo responders see is always authentic and current.
+  const [isSelfieCameraOn, setIsSelfieCameraOn] = useState(false);
+  const [cameraUnavailable, setCameraUnavailable] = useState(false);
+  const selfieVideoRef = useRef<HTMLVideoElement | null>(null);
+  const selfieStreamRef = useRef<MediaStream | null>(null);
 
   const stepIndex = STEP_ORDER.indexOf(step);
 
@@ -101,17 +106,54 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     if (prev) setStep(prev);
   };
 
-  const handlePhotoPick = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const result = ev.target?.result;
-      if (typeof result === 'string') setSelfiePhotoUrl(result);
-    };
-    reader.readAsDataURL(file);
+  const stopSelfieCamera = () => {
+    selfieStreamRef.current?.getTracks().forEach((track) => track.stop());
+    selfieStreamRef.current = null;
+    setIsSelfieCameraOn(false);
   };
 
+  const startSelfieCamera = async () => {
+    try {
+      setCameraUnavailable(false);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 640 } },
+        audio: false,
+      });
+      selfieStreamRef.current = stream;
+      setIsSelfieCameraOn(true);
+    } catch (err) {
+      console.warn('Selfie camera unavailable:', err);
+      setIsSelfieCameraOn(false);
+      setCameraUnavailable(true);
+    }
+  };
+
+  // Attach the stream once the <video> tile is mounted.
+  useEffect(() => {
+    if (isSelfieCameraOn && selfieVideoRef.current && selfieStreamRef.current) {
+      selfieVideoRef.current.srcObject = selfieStreamRef.current;
+      void selfieVideoRef.current.play().catch(() => {});
+    }
+  }, [isSelfieCameraOn]);
+
+  // Release the camera when the wizard unmounts.
+  useEffect(() => stopSelfieCamera, []);
+
+  const captureSelfie = () => {
+    const video = selfieVideoRef.current;
+    if (!video) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = 400;
+    canvas.height = 400;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const vWidth = video.videoWidth || 400;
+    const vHeight = video.videoHeight || 400;
+    const minDim = Math.min(vWidth, vHeight);
+    ctx.drawImage(video, (vWidth - minDim) / 2, (vHeight - minDim) / 2, minDim, minDim, 0, 0, 400, 400);
+    setSelfiePhotoUrl(canvas.toDataURL('image/jpeg', 0.85));
+    stopSelfieCamera();
+  };
   const handleImportContacts = async () => {
     const result = await importContactsFromPhone(contacts);
 
@@ -241,33 +283,57 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               </p>
             </div>
 
-            {/* Photo */}
+            {/* Photo — live capture only; no gallery upload so the photo a
+                responder sees is always authentic and current. */}
             <div className="flex items-center gap-4">
-              <button
-                type="button"
-                onClick={() => photoInputRef.current?.click()}
-                className="border-line hover:border-pine relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-2 border-dashed transition-colors"
-                aria-label={t('onboard.photo', lang)}
-              >
-                {selfiePhotoUrl ? (
+              <div className="border-line bg-well relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-2">
+                {isSelfieCameraOn ? (
+                  <video
+                    ref={selfieVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="h-full w-full object-cover"
+                  />
+                ) : selfiePhotoUrl ? (
                   <img src={selfiePhotoUrl} alt="You" className="h-full w-full object-cover" />
                 ) : (
                   <span className="text-ink-faint flex h-full w-full items-center justify-center">
                     <Camera className="h-7 w-7" />
                   </span>
                 )}
-              </button>
-              <div className="min-w-0">
+              </div>
+              <div className="min-w-0 space-y-1.5">
                 <div className="text-base font-bold">{t('onboard.photo', lang)}</div>
                 <p className="text-ink-soft text-sm">{t('onboard.photoWhy', lang)}</p>
+                <div className="flex flex-wrap gap-2">
+                  {isSelfieCameraOn ? (
+                    <>
+                      <button type="button" onClick={captureSelfie} className="btn btn-md btn-primary">
+                        <Camera className="h-4 w-4" />
+                        {t('onboard.takeSelfie', lang)}
+                      </button>
+                      <button type="button" onClick={stopSelfieCamera} className="btn btn-md btn-secondary">
+                        {t('onboard.back', lang)}
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => void startSelfieCamera()}
+                      className="btn btn-md btn-primary"
+                    >
+                      <Camera className="h-4 w-4" />
+                      {selfiePhotoUrl ? t('onboard.retakeSelfie', lang) : t('onboard.takeSelfie', lang)}
+                    </button>
+                  )}
+                </div>
+                {cameraUnavailable && (
+                  <p className="text-ochre-deep text-xs font-semibold">
+                    {t('onboard.cameraUnavailable', lang)}
+                  </p>
+                )}
               </div>
-              <input
-                ref={photoInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handlePhotoPick}
-                className="hidden"
-              />
             </div>
 
             <div>
@@ -408,7 +474,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                           key={item.name}
                           type="button"
                           onClick={() => setPlaces((prev) => ({ ...prev, work: item.full }))}
-                          className="chip bg-well hover:bg-sky-50 hover:text-sky-700 text-ink text-xs font-semibold py-1 px-2.5 transition-colors"
+                          className="chip bg-well hover:bg-sky-soft hover:text-sky text-ink text-xs font-semibold py-1 px-2.5 transition-colors"
                         >
                           💼 {item.name}
                         </button>

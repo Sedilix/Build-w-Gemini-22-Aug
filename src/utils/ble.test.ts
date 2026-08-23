@@ -10,6 +10,11 @@ import {
   parseEddystone,
   batteryPercentFromMillivolts,
   hasVenueGradePrecision,
+  lookupKnownBeacon,
+  updateBeaconsFromGps,
+  getBeaconsForVerification,
+  startBeaconScan,
+  stopBeaconScan,
 } from './ble';
 import { BLEBeaconScan } from '../types';
 
@@ -152,5 +157,76 @@ describe('hasVenueGradePrecision', () => {
 
   it('is false with nothing in range', () => {
     expect(hasVenueGradePrecision([])).toBe(false);
+  });
+});
+
+describe('lookupKnownBeacon', () => {
+  it('matches a registered iBeacon key exactly', () => {
+    const known = lookupKnownBeacon('fda50693-a4e2-4fb1-afcf-c6eb07647825-1001-4');
+    expect(known?.locationName).toContain('Toa Payoh Hub');
+  });
+
+  it('does not attribute partial or fuzzy keys to surveyed venues', () => {
+    // A substring of the BLOCK71 registry key must not resolve to the venue.
+    expect(lookupKnownBeacon('block71')).toBeUndefined();
+    expect(lookupKnownBeacon('sgh-block4')).toBeUndefined();
+  });
+});
+
+describe('updateBeaconsFromGps (honesty guarantees)', () => {
+  // SGH Block 4 porch is surveyed at 1.2792, 103.8344 and is isolated from
+  // every other registry entry by well over the 100 m match radius.
+
+  it('finds nothing when no surveyed venue is within 100 m', () => {
+    stopBeaconScan();
+    const result = updateBeaconsFromGps(1.281, 103.8344); // ~200 m north of SGH
+    expect(result).toEqual([]);
+  });
+
+  it('matches a venue within 100 m and reports the true GPS distance', () => {
+    stopBeaconScan();
+    // ~40 m north of the surveyed SGH porch position.
+    const result = updateBeaconsFromGps(1.27956, 103.8344);
+    expect(result).toHaveLength(1);
+    const match = result[0];
+    expect(match.id).toBe('sgh-block4-porch-dropoff');
+    expect(match.source).toBe('geofence');
+    expect(match.isKnownVenue).toBe(true);
+    // The distance must reflect the GPS gap, never a fabricated "1.8 m".
+    expect(match.estimatedDistanceMeters).toBeCloseTo(40, 0);
+    expect(match.estimatedDistanceMeters).toBeGreaterThan(10);
+  });
+
+  it('never reports a geofence match closer than 1.2 m', () => {
+    stopBeaconScan();
+    const result = updateBeaconsFromGps(1.2792, 103.8344); // exactly on the surveyed spot
+    expect(result).toHaveLength(1);
+    expect(result[0].estimatedDistanceMeters).toBeGreaterThanOrEqual(1.2);
+    expect(result[0].source).toBe('geofence');
+  });
+});
+
+describe('getBeaconsForVerification (no fabrication)', () => {
+  it('returns nothing when no beacon was genuinely observed', () => {
+    stopBeaconScan();
+    expect(getBeaconsForVerification()).toEqual([]);
+  });
+
+  it('returns geofence-matched venues but forgets them when scanning stops', () => {
+    stopBeaconScan();
+    updateBeaconsFromGps(1.2792, 103.8344);
+    expect(getBeaconsForVerification().length).toBeGreaterThan(0);
+    stopBeaconScan();
+    expect(getBeaconsForVerification()).toEqual([]);
+  });
+});
+
+describe('startBeaconScan without a Bluetooth radio', () => {
+  it('reports unavailable instead of inventing a demo beacon', async () => {
+    stopBeaconScan();
+    const state = await startBeaconScan();
+    expect(state.status).toBe('unavailable');
+    expect(state.beaconCount).toBe(0);
+    expect(getBeaconsForVerification()).toEqual([]);
   });
 });
