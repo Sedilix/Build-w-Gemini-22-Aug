@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { X, Plus, Trash2, UserPlus, Lock, BookUser, Star } from 'lucide-react';
 import { EmergencyContact, AccessibilitySettings } from '../types';
 import { ensureEmergency995 } from '../data/defaultContacts';
-import { importContactsFromPhone, isContactPickerSupported, setPreferredContact } from '../utils/contacts';
+import { importContactsFromPhone, isContactPickerSupported, setPreferredContact, normalisePhone } from '../utils/contacts';
 
 interface ManageContactsModalProps {
   isOpen: boolean;
@@ -43,7 +43,7 @@ export const ManageContactsModal: React.FC<ManageContactsModalProps> = ({
       id: `contact-${Date.now()}`,
       name: `${newName.trim()} (${newRelationship})`,
       relationship: newRelationship,
-      phone: newPhone.trim(),
+      phone: normalisePhone(newPhone.trim()),
       emoji: newEmoji,
       bgColor: 'bg-emerald-600 hover:bg-emerald-700 text-white',
       isPrimary: nonEmergencyCount === 0,

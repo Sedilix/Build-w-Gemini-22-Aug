@@ -9,6 +9,7 @@ import path from 'path';
 import { GoogleGenAI, Type } from '@google/genai';
 import { createServer as createViteServer } from 'vite';
 import { ringSamplePoints, bearingDegrees, withinFieldOfView, haversineMeters } from './src/utils/geo';
+import { SPEECHMATICS_VOICE_OPTIONS } from './src/types';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 9003;
@@ -65,7 +66,6 @@ app.get('/api/config/maps-key', (req, res) => {
 // sheltered-walkway-aware routing. Proxied server-side so credentials never
 // reach the client. Search is public; routing needs ONE_MAP_EMAIL/PASSWORD.
 
-const ONEMAP_SEARCH_URL = 'https://www.onemap.gov.sg/commonapi/search';
 const ONEMAP_AUTH_URL = 'https://developers.onemap.sg/privateapi/auth/post/sessionToken';
 const ONEMAP_ROUTE_URL = 'https://developers.onemap.sg/privateapi/routesvc/route';
 
@@ -87,27 +87,6 @@ async function getOneMapSessionToken(): Promise<string | null> {
     return null;
   }
 }
-
-// Public address search: HDB block/postal code lookup with geometry
-app.get('/api/onemap/search', async (req, res) => {
-  const query = String(req.query.q || '').trim();
-  if (!query) {
-    return res.status(400).json({ success: false, error: 'Missing ?q= search value' });
-  }
-  try {
-    const url = `${ONEMAP_SEARCH_URL}?searchVal=${encodeURIComponent(query)}&returnGeom=Y&getAddrDetails=Y&pageNum=1`;
-    const upstream = await fetch(url);
-    const contentType = upstream.headers.get('content-type') || '';
-    if (!upstream.ok || !contentType.includes('application/json')) {
-      return res.json({ success: false, results: [], totalFound: 0, error: `OneMap upstream returned ${upstream.status}` });
-    }
-    const data = await upstream.json();
-    res.json({ success: true, results: data.results || [], totalFound: data.totalFound || 0 });
-  } catch (err) {
-    console.warn('OneMap search error:', err);
-    res.status(502).json({ success: false, error: 'OneMap search unavailable' });
-  }
-});
 
 // Sheltered walkway / walking route between two SG coordinates (private API)
 app.post('/api/onemap/route', async (req, res) => {
@@ -201,49 +180,17 @@ app.post('/api/speechmatics/token', async (req, res) => {
 // NOTE: Speechmatics TTS preview currently supports exactly 4 voices.
 // See https://docs.speechmatics.com/text-to-speech/quickstart#voices
 app.get('/api/speechmatics/voices', (req, res) => {
-  const voices = [
-    {
-      id: 'sarah',
-      name: 'Sarah',
-      gender: 'female',
-      accent: 'British (UK)',
-      flag: '🇬🇧',
-      tone: 'Crisp & Professional',
-      description: 'Clear, reassuring, and professional female voice. Highly recommended for elderly users and emergency navigation.',
-      sampleText: 'Hello! I am Sarah. You are safe. I will help you verify your location and notify your family.',
-      isRecommended: true,
-    },
-    {
-      id: 'megan',
-      name: 'Megan',
-      gender: 'female',
-      accent: 'American (US)',
-      flag: '🇺🇸',
-      tone: 'Dynamic & Conversational',
-      description: 'Clear female companion voice with gentle inflection and smooth conversational cadence.',
-      sampleText: 'Hi there, I am Megan. Please stay sheltered on the bench while your driver arrives.',
-    },
-    {
-      id: 'theo',
-      name: 'Theo',
-      gender: 'male',
-      accent: 'British (UK)',
-      flag: '🇬🇧',
-      tone: 'Expressive & Modern',
-      description: 'Trusted British male presenter voice with distinct pronunciation and calm pacing.',
-      sampleText: 'Good day. Theo here. Your location is confirmed and ready to share with your caregiver.',
-    },
-    {
-      id: 'jack',
-      name: 'Jack',
-      gender: 'male',
-      accent: 'American (US)',
-      flag: '🇺🇸',
-      tone: 'Clear & Steady',
-      description: 'Clear, steady American male voice with natural intonation.',
-      sampleText: 'Hello, this is Jack. Your pickup coordinates are verified and ready to go.',
-    },
-  ];
+  const voices = SPEECHMATICS_VOICE_OPTIONS.map((v) => ({
+    id: v.id,
+    name: v.name,
+    gender: v.gender,
+    accent: v.accent,
+    flag: v.flag,
+    tone: v.tone,
+    description: v.description,
+    sampleText: v.sampleText,
+    isRecommended: v.isRecommended,
+  }));
 
   return res.json({
     hasSpeechmaticsKey: Boolean(getSpeechmaticsApiKey()),
@@ -808,7 +755,7 @@ const SINGAPORE_PRESET_PLACES: SingaporePresetPlace[] = [
 app.get('/api/onemap/search', async (req, res) => {
   const query = String(req.query.q || req.query.searchVal || '').trim();
   if (!query) {
-    return res.json({ found: 0, totalNumPages: 0, pageNum: 1, results: [] });
+    return res.status(400).json({ success: false, results: [], totalFound: 0, error: 'Missing ?q= search value' });
   }
 
   try {
@@ -820,14 +767,14 @@ app.get('/api/onemap/search', async (req, res) => {
     });
 
     if (!r.ok) {
-      return res.json({ found: 0, totalNumPages: 0, pageNum: 1, results: [] });
+      return res.json({ success: false, results: [], totalFound: 0, error: `OneMap upstream returned ${r.status}` });
     }
 
     const data = await r.json();
-    return res.json(data);
+    return res.json({ success: true, results: data.results || [], totalFound: data.found || data.totalFound || 0 });
   } catch (err: any) {
     console.warn('OneMap search proxy failed:', err.message);
-    return res.json({ found: 0, totalNumPages: 0, pageNum: 1, results: [] });
+    return res.status(502).json({ success: false, error: 'OneMap search unavailable' });
   }
 });
 

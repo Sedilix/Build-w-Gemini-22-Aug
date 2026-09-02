@@ -531,7 +531,7 @@ function SeniorSafeSpotHome() {
         `EMERGENCY: ${userProfile?.actualName || 'I'} need assistance at: ${verification?.formattedAddress || 'My Current Location'}.${batteryText}\nLive tracking: ${trackUrl}\nMap: ${verification?.shareUrls?.googleMapsUrl || ''}`
       );
       if (primary) {
-        window.location.href = `sms:${primary.phone.replace(/[^0-9+]/g, '')}?&body=${message}`;
+        window.location.href = `sms:${primary.phone.replace(/[^0-9+]/g, '')}?body=${message}`;
       } else {
         await navigator.clipboard?.writeText(trackUrl);
       }
@@ -898,7 +898,7 @@ function SeniorSafeSpotHome() {
         onTriggerSendLocation={() => {
           const primary = contacts.find((c) => c.isPrimary) || contacts[0];
           if (primary && verification?.shareUrls?.googleMapsUrl) {
-            window.location.href = `sms:${primary.phone}?&body=${encodeURIComponent(
+            window.location.href = `sms:${primary.phone}?body=${encodeURIComponent(
               `Hi! I need a pickup here: ${verification.formattedAddress}. Map: ${verification.shareUrls.googleMapsUrl}`
             )}`;
           }

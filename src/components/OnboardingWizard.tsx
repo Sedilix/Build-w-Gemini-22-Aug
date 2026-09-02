@@ -577,7 +577,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                       {!c.isPrimary ? (
                         <button
                           type="button"
-                          onClick={() => setContacts(setPreferredContact(contacts, c.id))}
+                          onClick={() => setContacts(prev => setPreferredContact(prev, c.id))}
                           className="text-xs font-bold text-ink-soft hover:text-pine hover:bg-pine-soft/50 border border-line rounded-lg px-2 py-1.5 flex items-center gap-1 transition-colors"
                           title="Set as preferred pickup recipient"
                         >

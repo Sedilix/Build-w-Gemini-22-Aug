@@ -201,7 +201,7 @@ export function buildPickupSharePayload(
   return {
     messageText,
     whatsappUrl: `https://wa.me/${digitsOnly}?text=${encoded}`,
-    smsUrl: `sms:${cleanPhone}?&body=${encoded}`,
+    smsUrl: `sms:${cleanPhone}?body=${encoded}`,
     telUrl: `tel:${cleanPhone}`,
     googleMapsUrl,
   };

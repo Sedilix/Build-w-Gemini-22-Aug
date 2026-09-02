@@ -66,6 +66,7 @@ export const VoiceCommandOverlay: React.FC<VoiceCommandOverlayProps> = ({
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
   const accumulatedTranscriptRef = useRef<string>('');
+  const isListeningRef = useRef(false);
 
   void verification;
 
@@ -73,6 +74,7 @@ export const VoiceCommandOverlay: React.FC<VoiceCommandOverlayProps> = ({
     if (!isOpen) {
       cleanupAudioSession();
       setIsListening(false);
+      isListeningRef.current = false;
       return;
     }
 
@@ -199,7 +201,7 @@ export const VoiceCommandOverlay: React.FC<VoiceCommandOverlayProps> = ({
       scriptProcessorRef.current = processor;
 
       processor.onaudioprocess = (e) => {
-        if (!isListening) return;
+        if (!isListeningRef.current) return;
         const inputData = e.inputBuffer.getChannelData(0);
         // Convert Float32Array to 16-bit PCM buffer for Speechmatics raw format
         const pcm16 = new Int16Array(inputData.length);
@@ -231,6 +233,7 @@ export const VoiceCommandOverlay: React.FC<VoiceCommandOverlayProps> = ({
       });
 
       setIsListening(true);
+      isListeningRef.current = true;
       setEngineStatus('Speechmatics Realtime SDK Active • Listening');
     } catch (err) {
       console.error('Error starting Speechmatics session:', err);
@@ -252,9 +255,11 @@ export const VoiceCommandOverlay: React.FC<VoiceCommandOverlayProps> = ({
       (err) => {
         console.warn('Voice recognition notice:', err);
         setIsListening(false);
+        isListeningRef.current = false;
       },
       () => {
         setIsListening(false);
+        isListeningRef.current = false;
       }
     );
 
@@ -262,6 +267,7 @@ export const VoiceCommandOverlay: React.FC<VoiceCommandOverlayProps> = ({
       controllerRef.current = controller;
       controller.start();
       setIsListening(true);
+      isListeningRef.current = true;
     } else {
       setAssistantResponse('Microphone voice typing ready. Tap a quick phrase below or type your request.');
     }
@@ -271,6 +277,7 @@ export const VoiceCommandOverlay: React.FC<VoiceCommandOverlayProps> = ({
     const textToProcess = accumulatedTranscriptRef.current.trim() || transcript.trim() || interimTranscript.trim();
     cleanupAudioSession();
     setIsListening(false);
+    isListeningRef.current = false;
 
     if (textToProcess) {
       handleProcessVoiceCommand(textToProcess);
@@ -282,6 +289,7 @@ export const VoiceCommandOverlay: React.FC<VoiceCommandOverlayProps> = ({
     setIsProcessing(true);
     cleanupAudioSession();
     setIsListening(false);
+    isListeningRef.current = false;
 
     try {
       // Step 2: Route transcript into Gemini's Reasoning & Semantic Inference Engine

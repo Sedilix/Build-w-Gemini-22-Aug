@@ -85,6 +85,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       setSaveSuccess(false);
       setErrorMessage(null);
     }
+    return () => {
+      // Ensure camera stream is released on unmount even if isOpen stays true
+      stopCamera();
+    };
   }, [isOpen]);
 
   const startCamera = async () => {
@@ -163,7 +167,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         emergencyContacts: contacts,
         phone: user.phoneNumber || profile?.phone,
         email: user.email || profile?.email,
-        authProvider: user.isAnonymous ? 'anonymous' : (user.providerData[0]?.providerId.includes('google') ? 'google' : 'phone'),
+        authProvider: user.isAnonymous ? 'anonymous' : (user.providerData[0]?.providerId?.includes('google') ? 'google' : 'phone'),
         medicalNotes: medicalNotes.trim(),
         createdAt: profile?.createdAt || Date.now(),
         updatedAt: Date.now(),

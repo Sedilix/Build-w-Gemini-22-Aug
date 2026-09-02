@@ -26,7 +26,7 @@ export const InteractiveMapDisplay: React.FC<InteractiveMapDisplayProps> = ({
   settings,
 }) => {
   const [dynamicKey, setDynamicKey] = useState<string>(() => {
-    return ((import.meta as any)?.env?.VITE_GOOGLE_MAPS_API_KEY as string) || '';
+    return (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) || '';
   });
 
   void settings;

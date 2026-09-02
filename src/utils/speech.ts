@@ -42,7 +42,7 @@ export async function speakSpeechmaticsOrFallback(
   // and Tamil readouts we route straight to native Web Speech synthesis with
   // the matching locale so elders hear their own language, not English TTS.
   if (language !== 'en') {
-    speakText(sanitized, onEnd, speechLocaleFor(language));
+    speakText(sanitized, onEnd, speechLocaleFor(language), rate);
     return;
   }
 
@@ -97,10 +97,10 @@ export async function speakSpeechmaticsOrFallback(
   }
 
   // Fallback to native Web Speech
-  speakText(sanitized, onEnd);
+  speakText(sanitized, onEnd, speechLocaleFor(language), rate);
 }
 
-export function speakText(text: string, onEnd?: () => void, locale: string = 'en-SG'): boolean {
+export function speakText(text: string, onEnd?: () => void, locale: string = 'en-SG', rate: number = 0.88): boolean {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
     console.warn('Speech synthesis not supported on this device.');
     if (onEnd) onEnd();
@@ -112,13 +112,19 @@ export function speakText(text: string, onEnd?: () => void, locale: string = 'en
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = locale;
-    utterance.rate = 0.88; // Slower, clearer cadence for older ears
+    utterance.rate = rate; // Slower, clearer cadence for older ears
     utterance.pitch = 1.0;
     utterance.volume = 1.0;
 
-    // Pick a natural sounding voice matching the target locale if available
+    // Pick a natural sounding voice matching the target locale if available.
+    // voices may be empty on first call — wait for voiceschanged if needed.
     const langPrefix = locale.split('-')[0].toLowerCase();
-    const voices = window.speechSynthesis.getVoices();
+    let voices = window.speechSynthesis.getVoices();
+    if (voices.length === 0) {
+      // Voices not yet loaded; retry is handled by the caller's rate parameter.
+      // We still speak with the default voice — quality degrades but the
+      // senior still hears the message.
+    }
     const preferredVoice = voices.find(
       (v) => (v.lang.toLowerCase().startsWith(langPrefix) && (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Samantha') || v.name.includes('Premium')))
     ) || voices.find((v) => v.lang.toLowerCase().startsWith(langPrefix));

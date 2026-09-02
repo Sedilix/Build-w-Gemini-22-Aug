@@ -99,7 +99,7 @@ export const OneTapSharePanel: React.FC<OneTapSharePanelProps> = ({
           contactName: contact.name,
           phone: contact.phone,
           address: verification?.formattedAddress || address,
-          googleMapsUrl: shareUrls?.googleMapsUrl || `https://www.google.com/maps/search/?api=1&query=${verification?.verifiedCoordinates.lat},${verification?.verifiedCoordinates.lng}`,
+          googleMapsUrl: shareUrls?.googleMapsUrl || (verification ? `https://www.google.com/maps/search/?api=1&query=${verification.verifiedCoordinates.lat},${verification.verifiedCoordinates.lng}` : 'https://www.google.com/maps'),
           driverHint: verification?.pickupInstructionsForDriver,
           blePrecision,
           incidentId: localStorage.getItem('senior_safespot_active_incident') || undefined,

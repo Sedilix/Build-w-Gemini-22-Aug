@@ -52,7 +52,7 @@ export const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> =
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Sync external value updates
   useEffect(() => {
