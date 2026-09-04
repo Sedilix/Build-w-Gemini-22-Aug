@@ -126,7 +126,7 @@ export const HeaderAccessibility: React.FC<HeaderAccessibilityProps> = ({
               id="select-language-dropdown"
               value={lang}
               onChange={(e) => onUpdateSettings((prev) => ({ ...prev, language: e.target.value as Language }))}
-              className="btn btn-md btn-secondary cursor-pointer appearance-none pl-9 pr-7 text-xs font-bold sm:pl-10 sm:pr-8 sm:text-sm"
+              className="btn btn-md btn-secondary cursor-pointer appearance-none pl-9 pr-7 text-sm font-bold sm:pl-10 sm:pr-8 sm:text-sm"
               aria-label={t('header.language', lang)}
             >
               {LANGUAGE_OPTIONS.map((opt) => (
@@ -207,7 +207,7 @@ export const HeaderAccessibility: React.FC<HeaderAccessibilityProps> = ({
           >
             <Type className="text-ink-soft h-5 w-5" />
             <span className="hidden sm:inline">
-              Text:{' '}
+              {t('header.text', lang)}:{' '}
               {settings.fontSize === 'extra-large' ? 'XL' : settings.fontSize === 'large' ? 'Large' : 'Med'}
             </span>
           </button>

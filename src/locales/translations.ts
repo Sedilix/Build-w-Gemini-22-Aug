@@ -87,6 +87,18 @@ export const TRANSLATIONS: Record<string, Partial<Record<Language, string>>> = {
     ms: 'Bahasa',
     ta: 'மொழி',
   },
+  'header.profile': {
+    en: 'Profile',
+    zh: '资料',
+    ms: 'Profil',
+    ta: 'சுயவிவரம்',
+  },
+  'header.text': {
+    en: 'Text',
+    zh: '字号',
+    ms: 'Teks',
+    ta: 'எழுத்து',
+  },
 
   // ── Hero "Pick Me Up Here!" Camera Landing ─────────────────────────────
   'hero.kicker': {
@@ -983,6 +995,12 @@ export const TRANSLATIONS: Record<string, Partial<Record<Language, string>>> = {
     ms: '✓ Pin Dihantar!',
     ta: '✓ முள் அனுப்பப்பட்டது!',
   },
+  'share.pinSentToBanner': {
+    en: '📍 Location Pin & Google Maps link sent to',
+    zh: '📍 位置图钉与地图链接已发送至',
+    ms: '📍 Pin Lokasi & pautan Peta dihantar kepada',
+    ta: '📍 இட முள் & வரைபட இணைப்பு அனுப்பப்பட்டது',
+  },
   'share.openMaps': {
     en: 'Open Maps',
     zh: '打开地图',
@@ -1204,6 +1222,122 @@ export const TRANSLATIONS: Record<string, Partial<Record<Language, string>>> = {
     zh: '完成',
     ms: 'Selesai',
     ta: 'முடிந்தது',
+  },
+
+  // ── Caregiver & Driver Preview Screen ──────────────────────────────────
+  'caregiver.kicker': {
+    en: 'Driver & Caregiver Live Screen',
+    zh: '司机与看护者实时屏幕',
+    ms: 'Skrin Langsung Pemandu & Penjaga',
+    ta: 'ஓட்டுநர் & பராமரிப்பாளர் நேரலைத் திரை',
+  },
+  'caregiver.title': {
+    en: 'Pickup Navigation Display',
+    zh: '接送导航显示',
+    ms: 'Paparan Navigasi Pengambilan',
+    ta: 'பிக்கப் வழிசெலுத்தல் திரை',
+  },
+  'caregiver.travelTime': {
+    en: 'Your Live Travel Time',
+    zh: '您的实时路程时间',
+    ms: 'Masa Perjalanan Langsung Anda',
+    ta: 'உங்கள் நேரடி பயண நேரம்',
+  },
+  'caregiver.etaHint': {
+    en: 'Open Google Maps below for a traffic-aware ETA from your current location.',
+    zh: '点击下方打开 Google 地图，获取从您当前位置出发的实时路况预估时间。',
+    ms: 'Buka Google Maps di bawah untuk anggaran masa tiba (ETA) berasaskan trafik dari lokasi semasa anda.',
+    ta: 'தற்போதைய இடத்திலிருந்து போக்குவரத்து நேரத்தை அறிய கீழே Google Maps-ஐ திறக்கவும்.',
+  },
+  'caregiver.verifiedSpot': {
+    en: 'Exact Verified Pickup Location',
+    zh: '精确验证接送地点',
+    ms: 'Lokasi Pengambilan Tepat Disahkan',
+    ta: 'துல்லியமாக சரிபார்க்கப்பட்ட இடம்',
+  },
+  'caregiver.precisionSummary': {
+    en: 'Verified with Places API Landmarks & Roads API Curbside Snapping',
+    zh: '已通过 Places API 地标与 Roads API 路边对齐双重验证',
+    ms: 'Disahkan dengan Mercu Tanda API Places & Penjajaran Tepi Jalan API Roads',
+    ta: 'Places API மற்றும் Roads API மூலம் சரிபார்க்கப்பட்டது',
+  },
+  'caregiver.precisionLayer': {
+    en: 'Multi-API Precision Layer',
+    zh: '多 API 高精度图层',
+    ms: 'Lapisan Ketepatan Berbilang API',
+    ta: 'மல்டி-API துல்லிய அடுக்கு',
+  },
+  'caregiver.placesApiDesc': {
+    en: 'Identifies nearby stores, entrances & visual landmarks.',
+    zh: '识别附近商铺、出入口与视觉地标。',
+    ms: 'Mengenal pasti kedai, pintu masuk & mercu tanda visual.',
+    ta: 'அருகிலுள்ள கடைகள், நுழைவாயில்கள் மற்றும் அடையாளங்களை அடையாளம் காட்டுகிறது.',
+  },
+  'caregiver.roadsApiDesc': {
+    en: 'Snaps raw GPS drift to the exact drivable curbside.',
+    zh: '将飘移的 GPS 偏差精确对齐到可行驶的路边。',
+    ms: 'Menjajarkan drift GPS ke tepi jalan boleh pandu yang tepat.',
+    ta: 'GPS பிழையை துல்லியமான சாலையோரத்திற்கு சீரமைக்கிறது.',
+  },
+  'caregiver.routesApiDesc': {
+    en: 'Computes real-time traffic-aware ETA & turn navigation.',
+    zh: '计算实时路况预估时间与逐向导航。',
+    ms: 'Mengira ETA berasaskan trafik masa nyata & navigasi selekoh.',
+    ta: 'நேரலை போக்குவரத்து ETA மற்றும் வழிகாட்டுதலை கணக்கிடுகிறது.',
+  },
+  'caregiver.driverNotes': {
+    en: 'Driver Instructions',
+    zh: '司机接送指示',
+    ms: 'Arahan Pemandu',
+    ta: 'ஓட்டுநர் வழிமுறைகள்',
+  },
+  'caregiver.seniorSnapshot': {
+    en: 'Surroundings Snapshot Provided by Senior',
+    zh: '长辈拍摄的环境现场照片',
+    ms: 'Foto Persekitaran Disediakan oleh Warga Emas',
+    ta: 'மூத்தவர் வழங்கிய சூழல் புகைப்படம்',
+  },
+  'caregiver.noPhoto': {
+    en: 'No live photo yet — captured when the senior taps “Pick Me Up Here!”',
+    zh: '暂无现场照片 — 长辈点击“来这里接我！”时会自动拍摄',
+    ms: 'Belum ada foto langsung — dirakam apabila warga emas mengetik “Ambil Saya Di Sini!”',
+    ta: 'நேரலை புகைப்படம் இல்லை — “இங்கு அழைக்கவும்” என்பதை தட்டும்போது எடுக்கப்படும்',
+  },
+  'caregiver.seniorPhotoBadge': {
+    en: "Senior's Live Photo",
+    zh: '长辈实时照片',
+    ms: 'Foto Langsung Warga Emas',
+    ta: 'மூத்தவரின் நேரலை படம்',
+  },
+  'caregiver.streetViewNoAvailable': {
+    en: 'Street View is not available at this spot.',
+    zh: '该地点暂无街景。',
+    ms: 'Street View tidak tersedia di tempat ini.',
+    ta: 'இங்கு Street View கிடைக்கவில்லை.',
+  },
+  'caregiver.streetViewBadge': {
+    en: 'Google Street View Reference',
+    zh: 'Google 街景参考',
+    ms: 'Rujukan Google Street View',
+    ta: 'Google Street View குறிப்பு',
+  },
+  'caregiver.openMapsNav': {
+    en: 'Open Google Maps Turn Navigation',
+    zh: '打开 Google 地图实时导航',
+    ms: 'Buka Navigasi Google Maps',
+    ta: 'Google Maps வழிசெலுத்தலை திற',
+  },
+  'caregiver.noVerifiedLoc': {
+    en: 'No verified location yet',
+    zh: '暂无已验证位置',
+    ms: 'Belum ada lokasi disahkan',
+    ta: 'சரிபார்க்கப்பட்ட இடம் இல்லை',
+  },
+  'caregiver.donePreview': {
+    en: 'Done Previewing',
+    zh: '完成预览',
+    ms: 'Selesai Pratonton',
+    ta: 'பார்வையிடல் முடிந்தது',
   },
 };
 

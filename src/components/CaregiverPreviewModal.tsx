@@ -17,6 +17,7 @@ import {
   MapPin
 } from 'lucide-react';
 import { LocationVerificationResult, AccessibilitySettings } from '../types';
+import { t } from '../locales/translations';
 
 interface CaregiverPreviewModalProps {
   isOpen: boolean;
@@ -40,7 +41,7 @@ export const CaregiverPreviewModal: React.FC<CaregiverPreviewModalProps> = ({
     if (isOpen) setStreetViewFailed(false);
   }, [isOpen, verification]);
 
-  void settings;
+  const lang = settings.language || 'en';
 
   // No invented addresses or coordinates: everything shown comes from the
   // actual verification result.
@@ -66,9 +67,9 @@ export const CaregiverPreviewModal: React.FC<CaregiverPreviewModalProps> = ({
               <Car className="h-6 w-6" />
             </div>
             <div>
-              <div className="section-kicker text-pine mb-0.5">Driver & Caregiver Live Screen</div>
+              <div className="section-kicker text-pine mb-0.5">{t('caregiver.kicker', lang)}</div>
               <h3 className="font-display text-2xl leading-tight font-bold tracking-tight text-ink">
-                Pickup Navigation Display
+                {t('caregiver.title', lang)}
               </h3>
             </div>
           </div>
@@ -91,10 +92,10 @@ export const CaregiverPreviewModal: React.FC<CaregiverPreviewModalProps> = ({
             </div>
             <div>
               <div className="section-kicker text-pine-deep">
-                Your Live Travel Time
+                {t('caregiver.travelTime', lang)}
               </div>
               <div className="text-base font-bold sm:text-lg">
-                Open Google Maps below for a traffic-aware ETA from your current location.
+                {t('caregiver.etaHint', lang)}
               </div>
             </div>
           </div>
@@ -105,13 +106,13 @@ export const CaregiverPreviewModal: React.FC<CaregiverPreviewModalProps> = ({
 
         {/* Big Address Card */}
         <div className="border-line bg-well/60 mb-5 rounded-xl border p-4">
-          <div className="section-kicker mb-1">Exact Verified Pickup Location</div>
+          <div className="section-kicker mb-1">{t('caregiver.verifiedSpot', lang)}</div>
           <h2 className="font-display text-ink text-2xl leading-tight font-bold">
             {address}
           </h2>
           <div className="text-pine-deep mt-2 flex items-center gap-1.5 text-sm font-bold sm:text-base">
             <ShieldCheck className="h-5 w-5" />
-            <span>Verified with Places API Landmarks & Roads API Curbside Snapping</span>
+            <span>{t('caregiver.precisionSummary', lang)}</span>
           </div>
         </div>
 
@@ -119,20 +120,20 @@ export const CaregiverPreviewModal: React.FC<CaregiverPreviewModalProps> = ({
         <div className="border-line bg-well/60 text-ink-soft mb-5 space-y-2 rounded-xl border p-4 text-sm">
           <div className="section-kicker flex items-center gap-1.5">
             <Layers className="h-4 w-4" />
-            <span>Multi-API Precision Layer</span>
+            <span>{t('caregiver.precisionLayer', lang)}</span>
           </div>
           <div className="grid grid-cols-1 gap-2 pt-1 sm:grid-cols-3">
             <div className="border-line bg-surface rounded-lg border p-2.5">
               <span className="text-ink block font-bold">1. Places API</span>
-              <span className="text-sm">Identifies nearby stores, entrances & visual landmarks.</span>
+              <span className="text-sm">{t('caregiver.placesApiDesc', lang)}</span>
             </div>
             <div className="border-line bg-surface rounded-lg border p-2.5">
               <span className="text-ink block font-bold">2. Roads API</span>
-              <span className="text-sm">Snaps raw GPS drift to the exact drivable curbside.</span>
+              <span className="text-sm">{t('caregiver.roadsApiDesc', lang)}</span>
             </div>
             <div className="border-line bg-surface rounded-lg border p-2.5">
               <span className="text-ink block font-bold">3. Routes API</span>
-              <span className="text-sm">Computes real-time traffic-aware ETA & turn navigation.</span>
+              <span className="text-sm">{t('caregiver.routesApiDesc', lang)}</span>
             </div>
           </div>
         </div>
@@ -142,7 +143,7 @@ export const CaregiverPreviewModal: React.FC<CaregiverPreviewModalProps> = ({
           <div className="flex items-start gap-3">
             <Sparkles className="text-ochre mt-0.5 h-5 w-5 shrink-0" />
             <div>
-              <div className="section-kicker text-ochre mb-1">Driver Instructions</div>
+              <div className="section-kicker text-ochre mb-1">{t('caregiver.driverNotes', lang)}</div>
               <p className="text-base leading-snug font-bold sm:text-lg">
                 “{verification?.pickupInstructionsForDriver || 'Pull up safely to the designated curbside.'}”
               </p>
@@ -154,7 +155,7 @@ export const CaregiverPreviewModal: React.FC<CaregiverPreviewModalProps> = ({
         <div className="mb-5">
           <div className="section-kicker text-ink-soft mb-2 flex items-center gap-1.5 text-sm">
             <Camera className="text-sky h-4 w-4" />
-            <span>Surroundings Snapshot Provided by Senior</span>
+            <span>{t('caregiver.seniorSnapshot', lang)}</span>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {/* Senior Photo */}
@@ -168,11 +169,11 @@ export const CaregiverPreviewModal: React.FC<CaregiverPreviewModalProps> = ({
               ) : (
                 <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-4 text-center text-xs font-semibold text-slate-300">
                   <Camera className="h-6 w-6" />
-                  No live photo yet — captured when the senior taps “Pick Me Up Here!”
+                  {t('caregiver.noPhoto', lang)}
                 </div>
               )}
               <div className="absolute top-2 left-2 rounded bg-black/75 px-2 py-0.5 text-xs font-bold text-white">
-                Senior's Live Photo
+                {t('caregiver.seniorPhotoBadge', lang)}
               </div>
             </div>
 
@@ -188,11 +189,11 @@ export const CaregiverPreviewModal: React.FC<CaregiverPreviewModalProps> = ({
               ) : (
                 <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-4 text-center text-xs font-semibold text-slate-300">
                   <MapPin className="h-6 w-6" />
-                  Street View is not available at this spot.
+                  {t('caregiver.streetViewNoAvailable', lang)}
                 </div>
               )}
               <div className="absolute top-2 left-2 rounded bg-black/75 px-2 py-0.5 text-xs font-bold text-white">
-                Google Street View Reference
+                {t('caregiver.streetViewBadge', lang)}
               </div>
               {showStreetView && (
                 <div className="absolute bottom-2 left-2 right-2 rounded bg-black/80 p-1.5 text-xs text-white">
@@ -238,13 +239,13 @@ export const CaregiverPreviewModal: React.FC<CaregiverPreviewModalProps> = ({
               className="btn btn-lg btn-primary"
             >
               <Navigation className="h-5 w-5" />
-              <span>Open Google Maps Turn Navigation</span>
+              <span>{t('caregiver.openMapsNav', lang)}</span>
               <ExternalLink className="h-4 w-4 opacity-60" />
             </a>
           ) : (
             <button type="button" disabled className="btn btn-lg btn-primary opacity-50">
               <Navigation className="h-5 w-5" />
-              <span>No verified location yet</span>
+              <span>{t('caregiver.noVerifiedLoc', lang)}</span>
             </button>
           )}
 
@@ -253,7 +254,7 @@ export const CaregiverPreviewModal: React.FC<CaregiverPreviewModalProps> = ({
             onClick={onClose}
             className="btn btn-lg btn-secondary"
           >
-            Done Previewing
+            {t('caregiver.donePreview', lang)}
           </button>
         </div>
       </div>
