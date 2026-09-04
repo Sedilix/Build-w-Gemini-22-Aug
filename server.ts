@@ -1689,8 +1689,27 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
+
+    // Never cache sw.js so service worker updates immediately across all clients
+    app.get('/sw.js', (req, res) => {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Content-Type', 'application/javascript');
+      res.sendFile(path.join(distPath, 'sw.js'));
+    });
+
+    // Never return index.html for missing /assets/* files — return 404 to avoid MIME type errors
+    app.use('/assets', express.static(path.join(distPath, 'assets'), {
+      maxAge: '1y',
+      immutable: true,
+      fallthrough: false,
+    }));
+
+    // Static files (manifest, icons, etc.)
     app.use(express.static(distPath));
+
+    // SPA fallback: serve index.html with no-cache so browsers always get fresh asset hashes
     app.get('*', (req, res) => {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }

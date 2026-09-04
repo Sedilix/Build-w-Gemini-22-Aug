@@ -32,17 +32,35 @@ import {
 import { UserProfile, EmergencyContact, Incident } from '../types';
 
 export const firebaseConfig = {
-  apiKey: (import.meta as any).env?.VITE_FIREBASE_API_KEY || '',
-  authDomain: (import.meta as any).env?.VITE_FIREBASE_AUTH_DOMAIN || '',
-  projectId: (import.meta as any).env?.VITE_FIREBASE_PROJECT_ID || '',
-  storageBucket: (import.meta as any).env?.VITE_FIREBASE_STORAGE_BUCKET || '',
-  messagingSenderId: (import.meta as any).env?.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
-  appId: (import.meta as any).env?.VITE_FIREBASE_APP_ID || '',
-  measurementId: (import.meta as any).env?.VITE_FIREBASE_MEASUREMENT_ID || ''
+  apiKey: (import.meta as any).env?.VITE_FIREBASE_API_KEY || 'AIzaSyBTJgt3h1eWOC12iYsTBYPxZx_eLyXFLIs',
+  authDomain: (import.meta as any).env?.VITE_FIREBASE_AUTH_DOMAIN || 'cybrdeck.firebaseapp.com',
+  projectId: (import.meta as any).env?.VITE_FIREBASE_PROJECT_ID || 'cybrdeck',
+  storageBucket: (import.meta as any).env?.VITE_FIREBASE_STORAGE_BUCKET || 'cybrdeck.firebasestorage.app',
+  messagingSenderId: (import.meta as any).env?.VITE_FIREBASE_MESSAGING_SENDER_ID || '258662267000',
+  appId: (import.meta as any).env?.VITE_FIREBASE_APP_ID || '1:258662267000:web:652ca286c29248df9bd58d',
+  measurementId: (import.meta as any).env?.VITE_FIREBASE_MEASUREMENT_ID || 'G-P15TZJSXBW'
 };
 
-// Initialize Firebase App singleton
-export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+// Initialize Firebase App singleton safely
+function initFirebaseApp() {
+  if (getApps().length > 0) return getApp();
+  try {
+    return initializeApp(firebaseConfig);
+  } catch (err) {
+    console.error('Failed to initialize Firebase with environment config, using fallback:', err);
+    return initializeApp({
+      apiKey: 'AIzaSyBTJgt3h1eWOC12iYsTBYPxZx_eLyXFLIs',
+      authDomain: 'cybrdeck.firebaseapp.com',
+      projectId: 'cybrdeck',
+      storageBucket: 'cybrdeck.firebasestorage.app',
+      messagingSenderId: '258662267000',
+      appId: '1:258662267000:web:652ca286c29248df9bd58d',
+      measurementId: 'G-P15TZJSXBW'
+    });
+  }
+}
+
+export const app = initFirebaseApp();
 export const auth = getAuth(app);
 
 /**
