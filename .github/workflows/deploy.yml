@@ -108,11 +108,20 @@ jobs:
           ONE_MAP_EMAIL: ${{ secrets.ONE_MAP_EMAIL }}
           ONE_MAP_PASSWORD: ${{ secrets.ONE_MAP_PASSWORD }}
         run: |
-          # Secrets are passed through the step env (never interpolated into the
-          # command line) and joined on a single argument. The ^@^ prefix picks @
-          # as the delimiter so values may safely contain commas.
+          ENV_FLAGS=()
+          VARS=""
+          [ -n "$GEMINI_API_KEY" ] && VARS="${VARS:+$VARS,}GEMINI_API_KEY=$GEMINI_API_KEY"
+          [ -n "$GOOGLE_MAPS_API_KEY" ] && VARS="${VARS:+$VARS,}GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY"
+          [ -n "$SPEECHMATICS_API_KEY" ] && VARS="${VARS:+$VARS,}SPEECHMATICS_API_KEY=$SPEECHMATICS_API_KEY"
+          [ -n "$ONE_MAP_EMAIL" ] && VARS="${VARS:+$VARS,}ONE_MAP_EMAIL=$ONE_MAP_EMAIL"
+          [ -n "$ONE_MAP_PASSWORD" ] && VARS="${VARS:+$VARS,}ONE_MAP_PASSWORD=$ONE_MAP_PASSWORD"
+
+          if [ -n "$VARS" ]; then
+            ENV_FLAGS=(--update-env-vars "$VARS")
+          fi
+
           gcloud run deploy safespot-sg \
             --region asia-southeast1 \
             --source . \
             --allow-unauthenticated \
-            --set-env-vars "^@^GEMINI_API_KEY=$GEMINI_API_KEY@GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY@SPEECHMATICS_API_KEY=$SPEECHMATICS_API_KEY@ONE_MAP_EMAIL=$ONE_MAP_EMAIL@ONE_MAP_PASSWORD=$ONE_MAP_PASSWORD"
+            "${ENV_FLAGS[@]}"
