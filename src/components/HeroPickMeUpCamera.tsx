@@ -197,7 +197,7 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
   }, []);
 
   const handleEnableBeacons = async () => {
-    const state = await startBeaconScan();
+    const state = await startBeaconScan(gps);
     setBleState(state);
     const beacons = getNearbyBeacons();
     setBleBeacons(beacons);
@@ -458,7 +458,7 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
                   ? `${bleBeacons[0].source === 'geofence' ? 'Nearby venue (GPS-matched)' : 'BLE Active'} • ${bleBeacons[0].locationName} · ≈${bleBeacons[0].estimatedDistanceMeters}m`
                   : 'Scanning for nearby beacons…'
                 : bleState.status === 'unavailable'
-                  ? 'Beacons unavailable here'
+                  ? (bleUnsupportedReason || bleState.error ? 'Beacons unavailable (Requires Chrome/Edge for BLE)' : 'Beacons unavailable here')
                   : 'Beacons off'}
             </span>
           </div>
