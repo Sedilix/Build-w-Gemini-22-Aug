@@ -58,6 +58,7 @@ import { ensureEmergency995 } from './data/defaultContacts';
 import { OnboardingWizard, OnboardingResult } from './components/OnboardingWizard';
 import { speakSpeechmaticsOrFallback, stopSpeaking } from './utils/speech';
 import { getBatteryStatus, watchBattery } from './utils/telemetry';
+import { getPersistentItem, setPersistentItem } from './utils/storage';
 import { 
   ensureMotionPermission, 
   motionPermissionNeedsGesture,
@@ -98,10 +99,10 @@ function SeniorSafeSpotHome() {
   const [settings, setSettings] = useState<AccessibilitySettings>(() => {
     const validVoiceIds = SPEECHMATICS_VOICE_OPTIONS.map((v) => v.id);
     try {
-      const saved = localStorage.getItem('senior_safespot_settings');
+      const saved = getPersistentItem('senior_safespot_settings');
       if (saved) {
         const parsed = JSON.parse(saved);
-        // Migrate stale voice IDs from localStorage (e.g. removed voices like 'ariana')
+        // Migrate stale voice IDs from storage (e.g. removed voices like 'ariana')
         // back to the default so TTS does not silently fall back to Web Speech API.
         if (parsed && !validVoiceIds.includes(parsed.speechmaticsVoice)) {
           parsed.speechmaticsVoice = 'sarah';
@@ -131,7 +132,7 @@ function SeniorSafeSpotHome() {
   // State: Emergency Contacts
   const [contacts, setContacts] = useState<EmergencyContact[]>(() => {
     try {
-      const saved = localStorage.getItem('senior_safespot_contacts');
+      const saved = getPersistentItem('senior_safespot_contacts');
       // 995 is re-inserted on every load: a senior who deleted it, or a stale
       // list synced from another device, must never leave them without it.
       if (saved) return ensureEmergency995(JSON.parse(saved));
@@ -142,7 +143,13 @@ function SeniorSafeSpotHome() {
   });
 
   // State: Telemetry, Photo & AI Verification
-  const [gps, setGps] = useState<GPSLocation | null>(null);
+  const [gps, setGps] = useState<GPSLocation | null>(() => {
+    try {
+      const cached = getPersistentItem('senior_safespot_last_gps');
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return null;
+  });
   const [gpsError, setGpsError] = useState<string | null>(null);
   const [currentPhoto, setCurrentPhoto] = useState<string | null>(null);
   const [verification, setVerification] = useState<LocationVerificationResult | null>(null);
@@ -161,7 +168,7 @@ function SeniorSafeSpotHome() {
   // State: Battery telemetry, live incident & fall detection
   const [battery, setBattery] = useState<BatteryStatus>({ level: null, charging: null, supported: false });
   const [activeIncidentId, setActiveIncidentId] = useState<string | null>(
-    () => localStorage.getItem('senior_safespot_active_incident')
+    () => getPersistentItem('senior_safespot_active_incident')
   );
   const [isAlertingFamily, setIsAlertingFamily] = useState(false);
   const [fallCountdown, setFallCountdown] = useState<number | null>(null);
@@ -170,11 +177,11 @@ function SeniorSafeSpotHome() {
   // the background boot verification never disables the giant button.
   const [heroBusy, setHeroBusy] = useState(false);
 
-  // First-launch setup runs before the landing page and is remembered, so the
-  // senior is asked for their details exactly once.
+  // First-launch setup runs before the landing page and is remembered via cookies/localStorage,
+  // so the senior is asked for their details exactly once.
   const [hasOnboarded, setHasOnboarded] = useState<boolean>(() => {
     try {
-      return localStorage.getItem('senior_safespot_onboarded') === 'true';
+      return getPersistentItem('senior_safespot_onboarded') === 'true';
     } catch {
       return false;
     }
@@ -208,7 +215,7 @@ function SeniorSafeSpotHome() {
           setUserProfile(profile);
           if (profile && profile.emergencyContacts && profile.emergencyContacts.length > 0) {
             setContacts(profile.emergencyContacts);
-            localStorage.setItem('senior_safespot_contacts', JSON.stringify(profile.emergencyContacts));
+            setPersistentItem('senior_safespot_contacts', JSON.stringify(profile.emergencyContacts));
           }
         });
         return () => unsubscribeProfile();
@@ -231,14 +238,14 @@ function SeniorSafeSpotHome() {
       document.body.classList.add('theme-warm-soft');
     }
     document.documentElement.setAttribute('data-fs', settings.fontSize);
-    localStorage.setItem('senior_safespot_settings', JSON.stringify(settings));
+    setPersistentItem('senior_safespot_settings', JSON.stringify(settings));
   }, [settings]);
 
   // Persist contacts and sync to Firestore if user is authenticated
   const handleSaveContacts = async (incoming: EmergencyContact[]) => {
     const updated = ensureEmergency995(incoming);
     setContacts(updated);
-    localStorage.setItem('senior_safespot_contacts', JSON.stringify(updated));
+    setPersistentItem('senior_safespot_contacts', JSON.stringify(updated));
 
     if (currentUser) {
       try {
@@ -337,6 +344,7 @@ function SeniorSafeSpotHome() {
           setGps(loc);
           setGpsError(null);
           setIsLoadingGPS(false);
+          setPersistentItem('senior_safespot_last_gps', JSON.stringify(loc));
           triggerLocationVerification(loc, currentPhoto);
         },
         (err) => {
@@ -508,7 +516,7 @@ function SeniorSafeSpotHome() {
         createdAt: now,
         updatedAt: now,
       });
-      localStorage.setItem('senior_safespot_active_incident', incidentId);
+      setPersistentItem('senior_safespot_active_incident', incidentId);
       setActiveIncidentId(incidentId);
       return incidentId;
     } catch (err) {
@@ -682,9 +690,9 @@ function SeniorSafeSpotHome() {
 
   const finishOnboarding = () => {
     try {
-      localStorage.setItem('senior_safespot_onboarded', 'true');
+      setPersistentItem('senior_safespot_onboarded', 'true');
     } catch {
-      /* Private mode: the wizard simply runs again next launch. */
+      /* Private mode fallback */
     }
     setHasOnboarded(true);
   };
@@ -706,7 +714,7 @@ function SeniorSafeSpotHome() {
     setUserProfile((prev) => ({ ...(prev ?? ({} as UserProfile)), ...profilePatch } as UserProfile));
 
     try {
-      localStorage.setItem('senior_safespot_profile', JSON.stringify(profilePatch));
+      setPersistentItem('senior_safespot_profile', JSON.stringify(profilePatch));
     } catch {
       /* Storage unavailable; the in-memory profile still serves this session. */
     }
