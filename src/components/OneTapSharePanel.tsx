@@ -189,7 +189,7 @@ export const OneTapSharePanel: React.FC<OneTapSharePanelProps> = ({
       {lastSentTo && (
         <div className="mb-4 flex items-center justify-center gap-2 rounded-2xl bg-pine-soft border-2 border-pine text-pine-deep p-4 text-base font-extrabold sm:text-lg shadow-sm animate-in fade-in duration-200">
           <Check className="h-6 w-6 stroke-[3] text-pine" />
-          <span>📍 Location Pin & Google Maps link sent to {lastSentTo}!</span>
+          <span>{t('share.pinSentToBanner', lang)} {lastSentTo}!</span>
         </div>
       )}
 
@@ -221,7 +221,7 @@ export const OneTapSharePanel: React.FC<OneTapSharePanelProps> = ({
                       {contact.isPrimary && !contact.locked && (
                         <span className="chip border-pine/60 bg-pine-soft text-pine-deep text-xs font-bold py-0.5 px-2 shrink-0">
                           <Star className="h-3 w-3 fill-pine text-pine" />
-                          Preferred
+                          {t('share.preferred', lang)}
                         </span>
                       )}
                     </div>
@@ -252,7 +252,7 @@ export const OneTapSharePanel: React.FC<OneTapSharePanelProps> = ({
                   ) : (
                     <Send className="h-5 w-5" />
                   )}
-                  <span>{isSending ? 'Sending…' : isSent ? '✓ Pin Sent!' : t('share.sendPin', lang)}</span>
+                  <span>{isSending ? t('share.sending', lang) : isSent ? t('share.pinSent', lang) : t('share.sendPin', lang)}</span>
                 </button>
 
                 <button
@@ -280,7 +280,7 @@ export const OneTapSharePanel: React.FC<OneTapSharePanelProps> = ({
           className="btn btn-md btn-secondary"
         >
           <Navigation className="text-sky h-5 w-5" />
-          <span>Open Maps</span>
+          <span>{t('share.openMaps', lang)}</span>
           <ExternalLink className="h-4 w-4 opacity-60" />
         </a>
 
@@ -299,7 +299,7 @@ export const OneTapSharePanel: React.FC<OneTapSharePanelProps> = ({
           className="btn btn-md btn-secondary"
         >
           <Share2 className="text-sky h-5 w-5" />
-          <span>Share to Any App</span>
+          <span>{t('share.shareToAnyApp', lang)}</span>
         </button>
       </div>
     </section>

@@ -21,6 +21,7 @@ import {
   speakSpeechmaticsOrFallback, 
   stopSpeaking 
 } from '../utils/speech';
+import { t } from '../locales/translations';
 
 interface VoiceCommandOverlayProps {
   isOpen: boolean;
@@ -59,6 +60,8 @@ export const VoiceCommandOverlay: React.FC<VoiceCommandOverlayProps> = ({
   const [recognizedAction, setRecognizedAction] = useState<string | null>(null);
   const [isSpeechmaticsActive, setIsSpeechmaticsActive] = useState(false);
   const [engineStatus, setEngineStatus] = useState<string>('Initializing speech engine...');
+
+  const lang = settings.language || 'en';
 
   const controllerRef = useRef<SpeechRecognitionController | null>(null);
   const speechmaticsClientRef = useRef<RealtimeClient | null>(null);
@@ -363,7 +366,7 @@ export const VoiceCommandOverlay: React.FC<VoiceCommandOverlayProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-display text-2xl leading-none font-bold tracking-tight voice-text">
-                  Voice Assistant
+                  {t('voice.title', lang)}
                 </h3>
                 {isSpeechmaticsActive && (
                   <span className="voice-chip">
@@ -372,7 +375,7 @@ export const VoiceCommandOverlay: React.FC<VoiceCommandOverlayProps> = ({
                 )}
               </div>
               <p className="mt-1 text-sm font-normal voice-subtle sm:text-base">
-                Powered by Speechmatics Realtime SDK & Gemini Reasoning
+                {t('voice.poweredBy', lang)}
               </p>
             </div>
           </div>
@@ -391,7 +394,7 @@ export const VoiceCommandOverlay: React.FC<VoiceCommandOverlayProps> = ({
                 title="Change Speechmatics voice"
               >
                 <Volume2 className="h-4 w-4 voice-accent" />
-                <span className="hidden sm:inline">Voice:</span>
+                <span className="hidden sm:inline">{t('voice.voiceLabel', lang)}</span>
                 <span className="uppercase voice-text">{settings.speechmaticsVoice || 'SARAH'}</span>
               </button>
             )}
@@ -427,10 +430,10 @@ export const VoiceCommandOverlay: React.FC<VoiceCommandOverlayProps> = ({
 
           <div className="mt-4 text-lg font-bold voice-text sm:text-xl">
             {isListening
-              ? 'Listening... Speak naturally'
+              ? t('voice.listening', lang)
               : isProcessing
-              ? 'Gemini Reasoning in Progress...'
-              : 'Tap microphone to speak'}
+              ? t('voice.reasoning', lang)
+              : t('voice.tapToSpeak', lang)}
           </div>
 
           {/* Engine Indicator */}
@@ -443,7 +446,7 @@ export const VoiceCommandOverlay: React.FC<VoiceCommandOverlayProps> = ({
           {(transcript || interimTranscript) && (
             <div className="mt-4 w-full max-w-lg voice-well p-4 text-left">
               <div className="mb-1 flex items-center justify-between text-xs font-bold tracking-wide voice-subtle uppercase">
-                <span>Transcribed Voice:</span>
+                <span>{t('voice.transcribed', lang)}</span>
                 {isSpeechmaticsActive && <span className="text-[11px] font-bold voice-subtle">Speechmatics Realtime</span>}
               </div>
               <p className="text-base font-bold italic voice-text sm:text-lg">
@@ -459,7 +462,7 @@ export const VoiceCommandOverlay: React.FC<VoiceCommandOverlayProps> = ({
               <div>
                 <div className="mb-1 flex items-center gap-1.5 text-xs font-bold tracking-wide voice-subtle uppercase">
                   <Cpu className="h-4 w-4 text-sky-400" />
-                  <span>Gemini Assistant Decision</span>
+                  <span>{t('voice.geminiDecision', lang)}</span>
                   {recognizedAction && (
                     <span className="ml-auto rounded-full bg-[#383123] px-2 py-0.5 text-[10px] font-bold voice-subtle">
                       {recognizedAction}
@@ -477,35 +480,35 @@ export const VoiceCommandOverlay: React.FC<VoiceCommandOverlayProps> = ({
         {/* Quick Speech Phrase Buttons */}
         <div className="mt-6 border-t voice-divider pt-4">
           <div className="mb-3 voice-label">
-            Or tap a common Singapore senior phrase:
+            {t('voice.quickPhrasesTitle', lang)}
           </div>
           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
             <button
               onClick={() => handleProcessVoiceCommand('Where am I right now?')}
               className="voice-btn"
             >
-              🗣️ “Where am I right now?”
+              🗣️ {t('voice.phraseWhere', lang)}
             </button>
 
             <button
               onClick={() => handleProcessVoiceCommand('Send my exact location to my daughter Sarah')}
               className="voice-btn"
             >
-              🗣️ “Send location to Sarah (Daughter)”
+              🗣️ {t('voice.phraseSendSarah', lang)}
             </button>
 
             <button
               onClick={() => handleProcessVoiceCommand('Take a photo of where I am standing')}
               className="voice-btn"
             >
-              📷 “Take a photo of my surroundings”
+              📷 {t('voice.phraseSurroundings', lang)}
             </button>
 
             <button
               onClick={() => handleProcessVoiceCommand('I need urgent Singapore SCDF 995 ambulance')}
               className="voice-btn-danger"
             >
-              🚨 “Emergency 995 SCDF Ambulance”
+              🚨 {t('voice.phrase995', lang)}
             </button>
           </div>
         </div>

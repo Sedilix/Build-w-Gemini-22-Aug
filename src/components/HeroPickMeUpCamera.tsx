@@ -30,6 +30,7 @@ import {
 import { subscribeToBLE, startBeaconScan, stopBeaconScan, getNearbyBeacons, pairSafetyTag, getBLECapability } from '../utils/ble';
 import { orderSavedPlaces, savedPlaceLabel, SAVED_PLACE_META } from '../utils/places';
 import { formatConciseAddress, formatDriverHint } from '../utils/address';
+import { t } from '../locales/translations';
 import {
   ensureOrientationPermission,
   getOrientationSnapshot,
@@ -80,7 +81,7 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
   const streamRef = useRef<MediaStream | null>(null);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  void settings; // Theming is driven by body-level design tokens, not per-component branches.
+  const lang = settings.language || 'en';
 
   const savedPlaces = orderSavedPlaces(profile?.savedPlaces);
 
@@ -254,7 +255,7 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
     <section id="hero-pick-me-up-section" className="card overflow-hidden">
       {/* Status strip — sensor lock: compass heading, GPS accuracy, fix state */}
       <div className="border-line bg-well/70 flex items-center justify-between gap-2 border-b px-3 py-2 sm:px-4">
-        <span className="section-kicker truncate">Point &amp; tap to be found</span>
+        <span className="section-kicker truncate">{t('hero.statusStrip', lang)}</span>
         <span className="text-ink-soft flex shrink-0 items-center gap-2 text-xs font-bold">
           <span className="flex items-center gap-1" title="Compass heading (sensor lock)">
             <Compass className={`h-3.5 w-3.5 ${liveOrientation?.heading != null ? 'text-sky' : 'text-ink-faint'}`} />
@@ -271,7 +272,7 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
           <span
             className={`h-2 w-2 rounded-full ${gps ? 'bg-pine' : 'bg-ink-faint animate-pulse'}`}
           ></span>
-          {gps ? 'GPS ready' : 'Finding GPS'}
+          {gps ? t('hero.gpsReady', lang) : t('hero.findingGps', lang)}
         </span>
       </div>
 
@@ -294,14 +295,14 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
               {isCameraIdle ? (
                 <>
                   <CameraOff className="h-8 w-8 text-white/50" />
-                  <p className="text-sm font-bold text-white">Camera paused to save battery</p>
+                  <p className="text-sm font-bold text-white">{t('hero.cameraPausedBattery', lang)}</p>
                   <button
                     type="button"
                     onClick={() => void startCamera()}
                     className="btn btn-md bg-white/15 text-white backdrop-blur-sm hover:bg-white/25"
                   >
                     <Camera className="h-4 w-4" />
-                    Resume camera
+                    {t('hero.resumeCamera', lang)}
                   </button>
                 </>
               ) : cameraError ? (
@@ -314,7 +315,7 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
                     className="btn btn-md bg-white/15 text-white backdrop-blur-sm hover:bg-white/25"
                   >
                     <Camera className="h-4 w-4" />
-                    Try again
+                    {t('hero.tryAgain', lang)}
                   </button>
                 </>
               ) : capturedPhoto ? (
@@ -322,7 +323,7 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
               ) : (
                 <>
                   <Camera className="h-8 w-8 animate-pulse text-white/50" />
-                  <p className="text-sm font-bold text-white">Starting camera…</p>
+                  <p className="text-sm font-bold text-white">{t('hero.startingCamera', lang)}</p>
                 </>
               )}
             </div>
@@ -341,14 +342,14 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
           {/* Level hint — only when the frame would be visibly canted */}
           {isLiveCameraActive && liveOrientation && !isSteadyCapture(liveOrientation) && (
             <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full border border-amber-300/40 bg-black/70 px-3 py-1 text-xs font-bold text-amber-300 backdrop-blur-sm">
-              Hold phone level
+              {t('hero.holdPhoneLevel', lang)}
             </div>
           )}
 
           {isAnalyzing && (
             <div className="bg-ink/80 absolute inset-0 flex flex-col items-center justify-center gap-2 p-4 text-center backdrop-blur-xs">
               <RefreshCw className="h-8 w-8 animate-spin text-white" />
-              <p className="text-sm font-bold text-white sm:text-base">Checking where you are…</p>
+              <p className="text-sm font-bold text-white sm:text-base">{t('hero.checkingWhere', lang)}</p>
             </div>
           )}
         </div>
@@ -362,13 +363,13 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
           className="giant-tap btn btn-danger w-full rounded-xl px-5 py-4 text-xl font-bold sm:py-5 sm:text-2xl"
         >
           <Camera className="h-6 w-6 sm:h-7 sm:w-7" />
-          <span>Pick Me Up Here</span>
+          <span>{t('hero.pickMeUp', lang)}</span>
         </button>
 
         {/* Saved places — the senior's own, set in their profile */}
         {savedPlaces.length > 0 ? (
           <div className="flex flex-wrap items-center gap-2">
-            <span className="section-kicker">Or I'm at</span>
+            <span className="section-kicker">{t('hero.orImAt', lang)}</span>
             {savedPlaces.map((place) => (
               <button
                 key={place.kind}
@@ -389,7 +390,7 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
             className="border-line text-ink-soft hover:border-pine hover:text-ink flex w-full items-center justify-center gap-2 rounded-xl border border-dashed px-4 py-2.5 text-sm font-bold transition-colors"
           >
             <Plus className="h-4 w-4" />
-            Save your home, work &amp; clinic for one-tap pickup
+            {t('hero.savePlacesTip', lang)}
           </button>
         )}
 
@@ -409,7 +410,7 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
                 ) : (
                   <CheckCircle2 className="text-pine-deep h-4 w-4 shrink-0" />
                 )}
-                {verification.isIndoors ? 'You are indoors' : 'Ready at the roadside'}
+                {verification.isIndoors ? t('hero.youAreIndoors', lang) : t('hero.readyAtRoadside', lang)}
               </span>
 
               <button
@@ -418,7 +419,7 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
                 className={`btn btn-md text-sm ${isSpeaking ? 'btn-danger' : 'btn-soft'}`}
               >
                 <Volume2 className="h-4 w-4" />
-                {isSpeaking ? 'Stop' : 'Listen'}
+                {isSpeaking ? t('hero.stop', lang) : t('hero.listen', lang)}
               </button>
             </div>
 
@@ -430,7 +431,7 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
             {verification.isIndoors ? (
               <p className="text-ink-soft flex items-start gap-1.5 text-sm leading-snug">
                 <DoorOpen className="text-ochre-deep mt-0.5 h-4 w-4 shrink-0" />
-                <span>{verification.indoorExitGuidance || 'Step out to the main taxi bay for pickup.'}</span>
+                <span>{verification.indoorExitGuidance || t('hero.stepOutTip', lang)}</span>
               </p>
             ) : (
               driverHint && <p className="text-ink-soft text-sm leading-snug">{driverHint}</p>
@@ -455,11 +456,11 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
             <span className={bleState.status === 'scanning' ? 'text-pine-deep' : 'text-ink-faint'}>
               {bleState.status === 'scanning'
                 ? bleBeacons[0]
-                  ? `${bleBeacons[0].source === 'geofence' ? 'Nearby venue (GPS-matched)' : 'BLE Active'} • ${bleBeacons[0].locationName} · ≈${bleBeacons[0].estimatedDistanceMeters}m`
-                  : 'Scanning for nearby beacons…'
+                  ? `${bleBeacons[0].source === 'geofence' ? t('hero.nearbyVenue', lang) : t('hero.bleActive', lang)} • ${bleBeacons[0].locationName} · ≈${bleBeacons[0].estimatedDistanceMeters}m`
+                  : t('hero.bleScanning', lang)
                 : bleState.status === 'unavailable'
-                  ? (bleUnsupportedReason || bleState.error ? 'Beacons unavailable (Requires Chrome/Edge for BLE)' : 'Beacons unavailable here')
-                  : 'Beacons off'}
+                  ? (bleUnsupportedReason || bleState.error ? t('hero.bleUnavailable', lang) : t('hero.bleUnavailable', lang))
+                  : t('hero.bleOff', lang)}
             </span>
           </div>
 
@@ -470,7 +471,7 @@ export const HeroPickMeUpCamera: React.FC<HeroPickMeUpCameraProps> = ({
             className="text-pine hover:text-pine-deep font-bold underline underline-offset-2 disabled:opacity-50"
             title={bleState.error || bleUnsupportedReason || undefined}
           >
-            {bleState.status === 'requesting' ? 'Starting…' : bleState.status === 'scanning' ? 'Turn off' : 'Turn on'}
+            {bleState.status === 'requesting' ? t('hero.starting', lang) : bleState.status === 'scanning' ? t('hero.turnOff', lang) : t('hero.turnOn', lang)}
           </button>
         </div>
 

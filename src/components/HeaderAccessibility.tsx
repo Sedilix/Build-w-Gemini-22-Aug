@@ -14,9 +14,10 @@ import {
   Type,
   Languages,
   User as UserIcon,
-  LogIn
+  LogIn,
+  ChevronDown
 } from 'lucide-react';
-import { AccessibilitySettings, HighContrastTheme, FontSizeLevel, UserProfile } from '../types';
+import { AccessibilitySettings, HighContrastTheme, FontSizeLevel, UserProfile, Language } from '../types';
 import { AppLogo } from './AppLogo';
 import { User as FirebaseUser } from 'firebase/auth';
 import { t, LANGUAGE_OPTIONS } from '../locales/translations';
@@ -69,15 +70,6 @@ export const HeaderAccessibility: React.FC<HeaderAccessibilityProps> = ({
 
   const lang = settings.language || 'en';
 
-  // One-tap language cycle: English → 中文 → Melayu → தமிழ் → English...
-  const cycleLanguage = () => {
-    const order = LANGUAGE_OPTIONS.map((l) => l.id);
-    const nextIndex = (order.indexOf(lang) + 1) % order.length;
-    onUpdateSettings((prev) => ({ ...prev, language: order[nextIndex] }));
-  };
-
-  const currentLang = LANGUAGE_OPTIONS.find((l) => l.id === lang) || LANGUAGE_OPTIONS[0];
-
   return (
     <header
       id="app-header-accessibility"
@@ -122,17 +114,31 @@ export const HeaderAccessibility: React.FC<HeaderAccessibilityProps> = ({
           48px accessible minimum either way — only the labels are dropped.
         */}
         <div className="-mx-1 flex items-center gap-1.5 overflow-x-auto px-1 sm:mx-0 sm:flex-wrap sm:gap-2.5 sm:px-0">
-          {/* One-Tap Language Switcher (EN / 中文 / Melayu / தமிழ்) */}
-          <button
-            id="btn-language-switcher"
-            onClick={cycleLanguage}
-            className="btn btn-md btn-secondary shrink-0 px-3 sm:px-4"
-            title={`${t('header.language', lang)}: ${LANGUAGE_OPTIONS.map((l) => l.nativeName).join(' / ')}`}
-            aria-label={`Change language, current: ${currentLang.englishName}`}
-          >
-            <Languages className="text-ink-soft h-5 w-5" />
-            <span className="hidden sm:inline">{currentLang.nativeName}</span>
-          </button>
+          {/* Mobile-Optimized Language Dropdown (EN / 中文 / Melayu / தமிழ்) */}
+          <div className="relative inline-flex items-center shrink-0">
+            <label htmlFor="select-language-dropdown" className="sr-only">
+              {t('header.language', lang)}
+            </label>
+            <div className="pointer-events-none absolute left-3 z-10 flex items-center text-ink-soft">
+              <Languages className="h-4 w-4 sm:h-5 sm:w-5" />
+            </div>
+            <select
+              id="select-language-dropdown"
+              value={lang}
+              onChange={(e) => onUpdateSettings((prev) => ({ ...prev, language: e.target.value as Language }))}
+              className="btn btn-md btn-secondary cursor-pointer appearance-none pl-9 pr-7 text-xs font-bold sm:pl-10 sm:pr-8 sm:text-sm"
+              aria-label={t('header.language', lang)}
+            >
+              {LANGUAGE_OPTIONS.map((opt) => (
+                <option key={opt.id} value={opt.id} className="bg-surface text-ink py-1">
+                  {opt.flag} {opt.nativeName}
+                </option>
+              ))}
+            </select>
+            <div className="pointer-events-none absolute right-2 z-10 text-ink-soft">
+              <ChevronDown className="h-3.5 w-3.5" />
+            </div>
+          </div>
 
           {/* Voice Command Mode Trigger */}
           <button

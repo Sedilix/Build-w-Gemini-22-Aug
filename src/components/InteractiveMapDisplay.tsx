@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { APIProvider, Map, AdvancedMarker, Pin, Circle } from '@vis.gl/react-google-maps';
 import { GPSLocation, LocationVerificationResult, AccessibilitySettings } from '../types';
+import { t } from '../locales/translations';
 
 interface InteractiveMapDisplayProps {
   gps: GPSLocation | null;
@@ -25,11 +26,10 @@ export const InteractiveMapDisplay: React.FC<InteractiveMapDisplayProps> = ({
   verification,
   settings,
 }) => {
+  const lang = settings.language || 'en';
   const [dynamicKey, setDynamicKey] = useState<string>(() => {
     return (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) || '';
   });
-
-  void settings;
 
   useEffect(() => {
     if (!dynamicKey) {
@@ -67,10 +67,10 @@ export const InteractiveMapDisplay: React.FC<InteractiveMapDisplayProps> = ({
           </div>
           <div>
             <h3 className="font-display text-2xl leading-none font-bold tracking-tight">
-              Live Map & Navigation Pin
+              {t('map.title', lang)}
             </h3>
             <p className="text-ink-soft mt-1 text-sm font-normal sm:text-base">
-              Precision coordinate: {lat.toFixed(5)}, {lng.toFixed(5)}
+              {t('map.precision', lang)} {lat.toFixed(5)}, {lng.toFixed(5)}
               {accuracyMeters != null && ` • ±${Math.round(accuracyMeters)}m`}
               {verification?.refinedByCandidate && ' • panorama-refined'}
             </p>
@@ -78,7 +78,7 @@ export const InteractiveMapDisplay: React.FC<InteractiveMapDisplayProps> = ({
         </div>
 
         <button onClick={openInGoogleMaps} className="btn btn-md btn-secondary" title="Open coordinates in external Google Maps application">
-          <span>Open in Full App</span>
+          <span>{t('map.openFull', lang)}</span>
           <ExternalLink className="text-ink-soft h-4 w-4" />
         </button>
       </div>
@@ -98,19 +98,16 @@ export const InteractiveMapDisplay: React.FC<InteractiveMapDisplayProps> = ({
               style={{ width: '100%', height: '100%' }}
             >
               <AdvancedMarker position={{ lat, lng }}>
-                <Pin background="#2f6d5b" glyphColor="#f6f4ec" borderColor="#24564a" scale={1.3} />
+                <Pin background="#16a34a" glyphColor="#ffffff" borderColor="#ffffff" />
               </AdvancedMarker>
-
-              {/* GNSS accuracy radius around the raw fix — the verified pin
-                  should sit inside this circle when there is no drift. */}
-              {gps && typeof gps.accuracy === 'number' && gps.accuracy > 0 && (
+              {accuracyMeters != null && accuracyMeters > 0 && (
                 <Circle
-                  center={{ lat: gps.latitude, lng: gps.longitude }}
-                  radius={gps.accuracy}
-                  strokeColor="#2f6d5b"
-                  strokeOpacity={0.6}
+                  center={{ lat, lng }}
+                  radius={Math.min(Math.max(accuracyMeters, 5), 80)}
+                  strokeColor="#16a34a"
+                  strokeOpacity={0.8}
                   strokeWeight={2}
-                  fillColor="#2f6d5b"
+                  fillColor="#16a34a"
                   fillOpacity={0.15}
                 />
               )}
@@ -146,7 +143,7 @@ export const InteractiveMapDisplay: React.FC<InteractiveMapDisplayProps> = ({
             <div className="absolute top-3 left-3 right-3 flex items-center gap-2 rounded-xl border border-white/20 bg-black/85 px-3.5 py-2 text-sm font-semibold text-white shadow-md backdrop-blur-md sm:right-auto">
               <ShieldCheck className="h-5 w-5 shrink-0 text-emerald-400" />
               <div className="truncate">
-                <span className="text-emerald-400">Verified Pin:</span> {address}
+                <span className="text-emerald-400">{t('map.verifiedPin', lang)}</span> {address}
               </div>
             </div>
 
@@ -169,10 +166,10 @@ export const InteractiveMapDisplay: React.FC<InteractiveMapDisplayProps> = ({
       <div className="text-ink-soft mt-3.5 flex flex-wrap items-center justify-between gap-2 text-sm font-semibold sm:text-base">
         <div className="flex items-center gap-1.5">
           <Compass className="text-pine h-5 w-5" />
-          <span>Coordinates: {lat.toFixed(6)}, {lng.toFixed(6)}</span>
+          <span>{t('map.coordinates', lang)} {lat.toFixed(6)}, {lng.toFixed(6)}</span>
         </div>
         <div>
-          <span>Navigation ready for Google Maps, Apple Maps & Waze</span>
+          <span>{t('map.navReady', lang)}</span>
         </div>
       </div>
     </section>

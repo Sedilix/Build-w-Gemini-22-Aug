@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { EmergencyContact, LocationVerificationResult, AccessibilitySettings } from '../types';
 import { buildPickupSharePayload } from '../utils/contacts';
+import { t } from '../locales/translations';
 
 interface PickupDispatchModalProps {
   isOpen: boolean;
@@ -42,6 +43,8 @@ export const PickupDispatchModal: React.FC<PickupDispatchModalProps> = ({
   const [copied, setCopied] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isSent, setIsSent] = useState(false);
+
+  const lang = settings.language || 'en';
 
   if (!isOpen || !verification) return null;
 
@@ -145,9 +148,9 @@ export const PickupDispatchModal: React.FC<PickupDispatchModalProps> = ({
               <Star className="h-6 w-6 fill-pine" />
             </div>
             <div>
-              <div className="section-kicker text-pine mb-0.5">Pick Me Up Here</div>
+              <div className="section-kicker text-pine mb-0.5">{t('dispatch.kicker', lang)}</div>
               <h3 className="font-display text-2xl leading-tight font-bold tracking-tight text-ink">
-                Send to {targetContact.name}
+                {t('dispatch.sendTo', lang)} {targetContact.name}
               </h3>
             </div>
           </div>
@@ -168,13 +171,13 @@ export const PickupDispatchModal: React.FC<PickupDispatchModalProps> = ({
               <MapPin className="h-6 w-6" />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-xs font-bold uppercase tracking-wider text-ink-faint">Verified Pickup Spot</div>
+              <div className="text-xs font-bold uppercase tracking-wider text-ink-faint">{t('dispatch.verifiedSpot', lang)}</div>
               <div className="text-ink text-base font-bold leading-snug">
                 {verification.formattedAddress}
               </div>
               {verification.pickupInstructionsForDriver && (
                 <p className="text-ink-soft text-xs mt-1 leading-relaxed">
-                  <strong>Driver Note: </strong>{verification.pickupInstructionsForDriver}
+                  <strong>{t('dispatch.driverNote', lang)} </strong>{verification.pickupInstructionsForDriver}
                 </p>
               )}
             </div>
@@ -194,7 +197,7 @@ export const PickupDispatchModal: React.FC<PickupDispatchModalProps> = ({
             )}
             <span className="chip border-line bg-surface text-ink-soft text-xs font-semibold">
               <Navigation className="h-3 w-3" />
-              Google Maps Pin Ready
+              {t('dispatch.mapsReady', lang)}
             </span>
           </div>
         </div>
@@ -218,10 +221,10 @@ export const PickupDispatchModal: React.FC<PickupDispatchModalProps> = ({
             )}
             <span>
               {isSending
-                ? `Sending Pin to ${targetContact.name.split(' ')[0]}…`
+                ? `${t('dispatch.sending', lang)} ${targetContact.name.split(' ')[0]}…`
                 : isSent
-                ? `✓ Pin Sent to ${targetContact.name.split(' ')[0]}!`
-                : `1-Tap Send Pin to ${targetContact.name.split(' ')[0]}`}
+                ? `${t('dispatch.sent', lang)} ${targetContact.name.split(' ')[0]}!`
+                : `${t('dispatch.sendPin', lang)} ${targetContact.name.split(' ')[0]}`}
             </span>
           </button>
 
@@ -242,7 +245,7 @@ export const PickupDispatchModal: React.FC<PickupDispatchModalProps> = ({
               className="btn btn-md btn-secondary flex items-center justify-center gap-2 font-bold py-2.5 text-xs sm:text-sm"
             >
               <Send className="h-4 w-4 text-pine" />
-              <span>SMS App</span>
+              <span>{t('dispatch.sms', lang)}</span>
             </button>
           </div>
 
@@ -253,7 +256,7 @@ export const PickupDispatchModal: React.FC<PickupDispatchModalProps> = ({
               className="btn btn-md btn-secondary w-full flex items-center justify-center gap-2 font-bold py-2.5"
             >
               <Phone className="h-4 w-4 text-pine" />
-              <span>Call {targetContact.name} ({targetContact.phone})</span>
+              <span>{t('dispatch.call', lang)} {targetContact.name} ({targetContact.phone})</span>
             </button>
           )}
         </div>
@@ -267,7 +270,7 @@ export const PickupDispatchModal: React.FC<PickupDispatchModalProps> = ({
             className="hover:text-pine flex items-center gap-1.5 underline underline-offset-2 py-1"
           >
             <ExternalLink className="h-3.5 w-3.5" />
-            Open Google Maps Pin
+            {t('dispatch.openGoogleMaps', lang)}
           </a>
 
           <div className="flex items-center gap-2">
@@ -277,7 +280,7 @@ export const PickupDispatchModal: React.FC<PickupDispatchModalProps> = ({
               className="hover:text-pine flex items-center gap-1 border border-line rounded-lg px-2.5 py-1 transition-colors"
             >
               <Share2 className="h-3.5 w-3.5" />
-              Share
+              {t('dispatch.share', lang)}
             </button>
 
             <button
@@ -286,7 +289,7 @@ export const PickupDispatchModal: React.FC<PickupDispatchModalProps> = ({
               className="hover:text-pine flex items-center gap-1 border border-line rounded-lg px-2.5 py-1 transition-colors"
             >
               {copied ? <Check className="h-3.5 w-3.5 text-pine" /> : <Copy className="h-3.5 w-3.5" />}
-              {copied ? 'Copied!' : 'Copy Text'}
+              {copied ? t('dispatch.copied', lang) : t('dispatch.copyText', lang)}
             </button>
           </div>
         </div>

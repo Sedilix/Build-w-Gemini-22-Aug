@@ -8,6 +8,7 @@ import { X, Plus, Trash2, UserPlus, Lock, BookUser, Star } from 'lucide-react';
 import { EmergencyContact, AccessibilitySettings } from '../types';
 import { ensureEmergency995 } from '../data/defaultContacts';
 import { importContactsFromPhone, isContactPickerSupported, setPreferredContact, normalisePhone } from '../utils/contacts';
+import { t } from '../locales/translations';
 
 interface ManageContactsModalProps {
   isOpen: boolean;
@@ -31,7 +32,7 @@ export const ManageContactsModal: React.FC<ManageContactsModalProps> = ({
   const [newPhone, setNewPhone] = useState('');
   const [newEmoji, setNewEmoji] = useState('👩💼');
 
-  void settings;
+  const lang = settings.language || 'en';
 
   if (!isOpen) return null;
 
@@ -103,10 +104,10 @@ export const ManageContactsModal: React.FC<ManageContactsModalProps> = ({
             </div>
             <div>
               <h3 className="font-display text-2xl leading-none font-bold tracking-tight">
-                Emergency & Family Contacts
+                {t('contacts.title', lang)}
               </h3>
               <p className="text-ink-soft mt-1 text-sm sm:text-base">
-                Customize who receives your 1-tap pickup alerts
+                {t('contacts.subtitle', lang)}
               </p>
             </div>
           </div>
@@ -147,7 +148,7 @@ export const ManageContactsModal: React.FC<ManageContactsModalProps> = ({
                     {c.isPrimary && !c.locked && (
                       <span className="chip border-pine/60 bg-pine-soft text-pine-deep text-xs font-bold py-0.5 px-2 shrink-0">
                         <Star className="h-3 w-3 fill-pine text-pine" />
-                        Preferred
+                        {t('share.preferred', lang)}
                       </span>
                     )}
                   </div>
@@ -199,17 +200,17 @@ export const ManageContactsModal: React.FC<ManageContactsModalProps> = ({
         {isContactPickerSupported() && (
           <button onClick={handleImportFromPhone} className="btn btn-md btn-secondary mb-3 w-full">
             <BookUser className="h-5 w-5" />
-            Import From Phone Contacts
+            {t('contacts.import', lang)}
           </button>
         )}
         {importNote && <p className="text-ink-soft mb-3 text-sm font-semibold">{importNote}</p>}
 
         {/* Add New Contact Form */}
         <div className="border-line bg-well/60 mb-6 rounded-xl border p-4 sm:p-5">
-          <div className="section-kicker mb-3 text-sm">Add New Family Member or Caregiver</div>
+          <div className="section-kicker mb-3 text-sm">{t('contacts.addContact', lang)}</div>
           <div className="space-y-3">
             <div>
-              <label className="label" htmlFor="contact-name">Name</label>
+              <label className="label" htmlFor="contact-name">{t('contacts.name', lang)}</label>
               <input
                 id="contact-name"
                 type="text"
@@ -222,7 +223,7 @@ export const ManageContactsModal: React.FC<ManageContactsModalProps> = ({
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="label" htmlFor="contact-relationship">Relationship</label>
+                <label className="label" htmlFor="contact-relationship">{t('contacts.relationship', lang)}</label>
                 <select
                   id="contact-relationship"
                   value={newRelationship}
@@ -258,7 +259,7 @@ export const ManageContactsModal: React.FC<ManageContactsModalProps> = ({
             </div>
 
             <div>
-              <label className="label" htmlFor="contact-phone">Phone Number (Singapore / International)</label>
+              <label className="label" htmlFor="contact-phone">{t('contacts.phone', lang)} (Singapore / International)</label>
               <input
                 id="contact-phone"
                 type="tel"
@@ -275,13 +276,13 @@ export const ManageContactsModal: React.FC<ManageContactsModalProps> = ({
               className="btn btn-lg btn-primary w-full"
             >
               <Plus className="h-5 w-5" />
-              <span>Add to One-Tap List</span>
+              <span>{t('contacts.addContact', lang)}</span>
             </button>
           </div>
         </div>
 
         <button onClick={onClose} className="btn btn-lg btn-secondary w-full">
-          Done
+          {t('common.done', lang)}
         </button>
       </div>
     </div>

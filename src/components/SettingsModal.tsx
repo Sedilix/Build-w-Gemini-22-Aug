@@ -26,6 +26,7 @@ import {
   FontSizeLevel 
 } from '../types';
 import { speakSpeechmaticsOrFallback, stopSpeaking } from '../utils/speech';
+import { t } from '../locales/translations';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -43,6 +44,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onOpenManageContacts,
 }) => {
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
+
+  const lang = settings.language || 'en';
 
   if (!isOpen) return null;
 
@@ -86,10 +89,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
             <div>
               <h2 className="font-display text-2xl leading-none font-bold tracking-tight">
-                App & Voice Settings
+                {t('settings.title', lang)}
               </h2>
               <p className="text-ink-soft mt-1 text-sm sm:text-base">
-                Customize Speechmatics voices, audio playback & visual accessibility
+                {t('settings.subtitle', lang)}
               </p>
             </div>
           </div>
@@ -115,15 +118,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <Waves className="text-sky h-5 w-5" />
-                <h3 className="text-lg font-bold sm:text-xl">Speechmatics Text-to-Speech Voice</h3>
+                <h3 className="text-lg font-bold sm:text-xl">{t('settings.voiceTitle', lang)}</h3>
               </div>
               <span className="chip border-pine/40 bg-pine-soft text-pine-deep text-sm">
-                Active: {activeVoice.name} ({activeVoice.accent})
+                {t('settings.active', lang)} {activeVoice.name} ({activeVoice.accent})
               </span>
             </div>
 
             <p className="text-ink-soft text-sm leading-relaxed sm:text-base">
-              Select the voice persona used to read your verified location, safety guidelines, and driver pickup instructions. Tap <strong className="text-ink">Listen</strong> to sample each voice.
+              {t('settings.voicePrompt', lang)}
             </p>
 
             {/* Voice Cards Grid */}
@@ -185,10 +188,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         {isSelected ? (
                           <>
                             <CheckCircle2 className="h-4 w-4" />
-                            <span>Selected</span>
+                            <span>{t('settings.selected', lang)}</span>
                           </>
                         ) : (
-                          <span>Select Voice</span>
+                          <span>{t('settings.selectVoice', lang)}</span>
                         )}
                       </button>
 
@@ -205,12 +208,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         {isPlaying ? (
                           <>
                             <Square className="h-3.5 w-3.5 fill-current" />
-                            <span>Stop</span>
+                            <span>{t('settings.stop', lang)}</span>
                           </>
                         ) : (
                           <>
                             <Play className="text-pine h-3.5 w-3.5 fill-current" />
-                            <span>Listen</span>
+                            <span>{t('settings.listen', lang)}</span>
                           </>
                         )}
                       </button>
@@ -225,16 +228,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <section id="section-audio-preferences" className="border-line space-y-3 border-t pt-4">
             <div className="flex items-center gap-2">
               <Volume2 className="text-pine h-5 w-5" />
-              <h3 className="text-lg font-bold sm:text-xl">Audio & Speech Guidance</h3>
+              <h3 className="text-lg font-bold sm:text-xl">{t('settings.audioHeading', lang)}</h3>
             </div>
 
             <div className="space-y-2.5">
               {/* Spoken Guidance Toggle */}
               <div className="border-line bg-well/60 flex items-center justify-between gap-3 rounded-xl border p-4">
                 <div>
-                  <div className="text-base font-bold sm:text-lg">Automatic Spoken Guidance</div>
+                  <div className="text-base font-bold sm:text-lg">{t('settings.autoSpoken', lang)}</div>
                   <div className="text-ink-soft text-sm">
-                    Reads verified address, landmark visual clues, and safety tips automatically
+                    {t('settings.autoSpokenDesc', lang)}
                   </div>
                 </div>
 
@@ -258,9 +261,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               {/* Speech Speed Cadence */}
               <div className="border-line bg-well/60 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4">
                 <div>
-                  <div className="text-base font-bold sm:text-lg">Elder-Friendly Speaking Cadence</div>
+                  <div className="text-base font-bold sm:text-lg">{t('settings.cadence', lang)}</div>
                   <div className="text-ink-soft text-sm">
-                    Slower pace (0.85x) allows easier comprehension for senior listeners
+                    {t('settings.cadenceDesc', lang)}
                   </div>
                 </div>
 
@@ -272,7 +275,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       (settings.speechmaticsRate ?? 0.85) <= 0.9 ? 'btn-primary' : 'btn-secondary'
                     }`}
                   >
-                    Gentle (0.85x)
+                    {t('settings.gentle', lang)}
                   </button>
                   <button
                     type="button"
@@ -281,7 +284,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       (settings.speechmaticsRate ?? 0.85) > 0.9 ? 'btn-primary' : 'btn-secondary'
                     }`}
                   >
-                    Normal (1.0x)
+                    {t('settings.normal', lang)}
                   </button>
                 </div>
               </div>
@@ -293,7 +296,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <section id="section-visual-themes" className="border-line space-y-3 border-t pt-4">
             <div className="flex items-center gap-2">
               <Eye className="text-ochre h-5 w-5" />
-              <h3 className="text-lg font-bold sm:text-xl">Display & High-Contrast Mode</h3>
+              <h3 className="text-lg font-bold sm:text-xl">{t('settings.displayThemeHeading', lang)}</h3>
             </div>
 
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -329,7 +332,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <section id="section-font-sizing" className="border-line space-y-3 border-t pt-4">
             <div className="flex items-center gap-2">
               <Type className="text-sky h-5 w-5" />
-              <h3 className="text-lg font-bold sm:text-xl">Text Size Scaling</h3>
+              <h3 className="text-lg font-bold sm:text-xl">{t('settings.textSizeHeading', lang)}</h3>
             </div>
 
             <div className="grid grid-cols-3 gap-2">
@@ -365,7 +368,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <ShieldAlert className="text-brick h-5 w-5" />
-                <h3 className="text-lg font-bold sm:text-xl">Crash & Fall Sensor Protection</h3>
+                <h3 className="text-lg font-bold sm:text-xl">{t('settings.motionHeading', lang)}</h3>
               </div>
               <span className="chip border-pine/40 bg-pine-soft text-pine-deep text-xs font-bold">
                 iOS & Android Sensor Fusion
@@ -373,7 +376,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
 
             <p className="text-ink-soft text-xs sm:text-sm">
-              Uses high-G accelerometer vectors, gyroscope angular rotation, and GPS velocity shifts (similar to Apple Crash Detection and Google Personal Safety) to automatically trigger 10-second cancelable SOS alerts.
+              {t('settings.motionDesc', lang)}
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -389,10 +392,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               >
                 <div>
                   <div className="font-bold text-sm sm:text-base flex items-center gap-1.5">
-                    <span>🚗 Vehicle Crash Detection</span>
+                    <span>🚗 {t('settings.vehicleCrash', lang)}</span>
                   </div>
                   <div className="text-xs text-ink-soft mt-1">
-                    Detects sudden high-speed collisions (&gt; 20 km/h + 3G+ impact shock)
+                    {t('settings.vehicleCrashDesc', lang)}
                   </div>
                 </div>
                 <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 mt-0.5 border ${
@@ -416,10 +419,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               >
                 <div>
                   <div className="font-bold text-sm sm:text-base flex items-center gap-1.5">
-                    <span>🚶 Slip & Fall Detection</span>
+                    <span>🚶 {t('settings.slipFall', lang)}</span>
                   </div>
                   <div className="text-xs text-ink-soft mt-1">
-                    Detects free-fall drop followed by hard ground impact
+                    {t('settings.slipFallDesc', lang)}
                   </div>
                 </div>
                 <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 mt-0.5 border ${
@@ -438,7 +441,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Users className="text-pine h-5 w-5" />
-                <h3 className="text-lg font-bold sm:text-xl">Caregivers & SOS 995</h3>
+                <h3 className="text-lg font-bold sm:text-xl">{t('settings.contactsHeading', lang)}</h3>
               </div>
 
               {onOpenManageContacts && (
@@ -450,7 +453,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   }}
                   className="text-pine-deep text-sm font-bold hover:underline"
                 >
-                  Edit Contacts →
+                  {t('settings.editContacts', lang)}
                 </button>
               )}
             </div>

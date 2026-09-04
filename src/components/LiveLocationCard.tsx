@@ -40,7 +40,7 @@ export const LiveLocationCard: React.FC<LiveLocationCardProps> = ({
 }) => {
   const lang = settings.language || 'en';
 
-  const address = verification?.formattedAddress || (gps ? `${gps.latitude.toFixed(5)}, ${gps.longitude.toFixed(5)}` : 'Locating your current address...');
+  const address = verification?.formattedAddress || (gps ? `${gps.latitude.toFixed(5)}, ${gps.longitude.toFixed(5)}` : t('live.locating', lang));
   const accuracy = verification?.originalCoordinates?.accuracyMeters ?? gps?.accuracy ?? 25;
 
   return (
@@ -53,7 +53,7 @@ export const LiveLocationCard: React.FC<LiveLocationCardProps> = ({
             <span className="bg-pine relative inline-flex h-3.5 w-3.5 rounded-full"></span>
           </span>
           <span className="section-kicker text-sm">
-            {isVerifyingAI ? 'Verifying with Gemini & Maps...' : 'Live Pickup Location'}
+            {isVerifyingAI ? t('live.statusVerifying', lang) : t('live.statusReady', lang)}
           </span>
         </div>
 
@@ -62,13 +62,13 @@ export const LiveLocationCard: React.FC<LiveLocationCardProps> = ({
           {verification && (
             <span className="chip border-pine/40 bg-pine-soft text-pine-deep text-sm">
               <ShieldCheck className="h-4 w-4" />
-              {verification.confidenceScore}% Verified
+              {verification.confidenceScore}% {t('live.verified', lang)}
             </span>
           )}
 
           <span className="text-ink-soft flex items-center gap-1.5 text-sm font-semibold">
             <Navigation className="h-4 w-4" />
-            Accuracy: ±{Math.round(accuracy)}m
+            {t('live.accuracy', lang)}{Math.round(accuracy)}m
           </span>
         </div>
       </div>
@@ -80,7 +80,7 @@ export const LiveLocationCard: React.FC<LiveLocationCardProps> = ({
         </div>
 
         <div className="min-w-0 flex-1">
-          <div className="section-kicker mb-1">Where you are standing</div>
+          <div className="section-kicker mb-1">{t('live.whereStanding', lang)}</div>
           <h2 className="font-display text-ink text-2xl leading-tight font-bold break-words sm:text-3xl">
             {address}
           </h2>
@@ -98,10 +98,10 @@ export const LiveLocationCard: React.FC<LiveLocationCardProps> = ({
       {verification?.isIndoors && (
         <div className="mb-5 rounded-xl border-2 border-amber-400 bg-ochre-soft text-ink p-4 space-y-1">
           <div className="flex items-center gap-2 font-extrabold text-sm sm:text-base">
-            <span>🏠 INDOORS: {verification.indoorContext || 'Inside Building / Concourse'}</span>
+            <span>🏠 {t('live.indoors', lang)}: {verification.indoorContext || 'Inside Building / Concourse'}</span>
           </div>
           <p className="text-xs sm:text-sm font-semibold">
-            <strong>Pickup Tip: </strong>{verification.indoorExitGuidance || 'Please step towards the ground floor entrance or taxi bay.'}
+            <strong>{t('live.pickupTip', lang)}: </strong>{verification.indoorExitGuidance || t('live.stepEntrance', lang)}
           </p>
         </div>
       )}
@@ -113,7 +113,7 @@ export const LiveLocationCard: React.FC<LiveLocationCardProps> = ({
             <Sparkles className="text-ochre mt-0.5 h-5 w-5 shrink-0" />
             <div>
               <div className="section-kicker text-ochre mb-1">
-                AI Pickup Instructions for Driver & Caregiver
+                {t('live.aiInstructionsTitle', lang)}
               </div>
               <p className="text-base leading-snug font-semibold sm:text-lg">
                 “{verification.pickupInstructionsForDriver}”
@@ -129,7 +129,7 @@ export const LiveLocationCard: React.FC<LiveLocationCardProps> = ({
           id="btn-speak-address-large"
           onClick={onSpeakAddress}
           className="btn btn-lg btn-primary"
-          aria-label="Read my current address out loud"
+          aria-label={t('live.readAddress', lang)}
         >
           <Volume2 className={`h-6 w-6 ${isSpeaking ? 'animate-pulse' : ''}`} />
           <span>{isSpeaking ? t('live.readingAddress', lang) : t('live.readAddress', lang)}</span>
@@ -158,15 +158,15 @@ export const LiveLocationCard: React.FC<LiveLocationCardProps> = ({
         <div className="text-ink-soft flex flex-wrap items-center gap-2 pt-1 text-xs font-semibold sm:text-sm">
           <span className="chip border-line bg-well text-ink-soft">
             <span className="bg-pine h-2 w-2 rounded-full"></span>
-            Places API: {verification?.nearbyPlaces?.length ? `${verification.nearbyPlaces.length} Landmarks` : 'Nearby POIs'}
+            Places API: {verification?.nearbyPlaces?.length ? `${verification.nearbyPlaces.length} ${t('live.landmarks', lang)}` : 'Nearby POIs'}
           </span>
           <span className="chip border-line bg-well text-ink-soft">
             <span className="bg-sky h-2 w-2 rounded-full"></span>
-            Roads API: {verification?.roadSnapping?.snapped ? 'Curbside Snapped' : 'Road Aligned'}
+            Roads API: {verification?.roadSnapping?.snapped ? t('live.curbsideSnapped', lang) : t('live.roadAligned', lang)}
           </span>
           <span className="chip border-line bg-well text-ink-soft">
             <span className="bg-ochre h-2 w-2 rounded-full"></span>
-            Routes API: Live Driver Navigation
+            {t('live.routesNavigation', lang)}
           </span>
           {verification?.bleBeacons && verification.bleBeacons.length > 0 && (
             <span className="chip border-sky-400 bg-sky-50 text-sky-900 font-bold">
